@@ -1,5 +1,6 @@
+import evaluate
 import numpy as np
-from datasets import load_dataset, load_metric
+from datasets import load_dataset
 from transformers import AutoModelForTokenClassification, AutoTokenizer, DataCollatorForTokenClassification, Trainer, TrainingArguments
 
 # 1. Load dataset
@@ -8,6 +9,7 @@ dataset = load_dataset("conll2003")
 # 2. Load tokenizer and model
 model_checkpoint = "mistralai/Mistral-7B-v0.3"  # Replace with your checkpoint path if local
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint, use_fast=True)
+tokenizer.pad_token = tokenizer.eos_token  # Set pad token to eos token for Mistral
 model = AutoModelForTokenClassification.from_pretrained(
     model_checkpoint, num_labels=dataset["train"].features["ner_tags"].feature.num_classes
 )
@@ -42,7 +44,7 @@ tokenized_datasets = dataset.map(tokenize_and_align_labels, batched=True, remove
 data_collator = DataCollatorForTokenClassification(tokenizer)
 
 # 5. Metrics
-metric = load_metric("seqeval")
+metric = evaluate.load("seqeval")
 
 
 def compute_metrics(p):
@@ -62,7 +64,7 @@ def compute_metrics(p):
 # 6. Training arguments
 training_args = TrainingArguments(
     output_dir="./mistral-ner-finetuned",
-    evaluation_strategy="epoch",
+    eval_strategy="epoch",
     save_strategy="epoch",
     learning_rate=2e-5,
     per_device_train_batch_size=8,  # Adjust as needed for multi-GPU
@@ -72,8 +74,8 @@ training_args = TrainingArguments(
     logging_dir="./logs",
     logging_steps=50,
     report_to="none",
-    fp16=False,
-    bf16=True,  # Set to True if your GPUs support bf16, otherwise use fp16=True
+    fp16=True,
+    bf16=False,
     push_to_hub=False,
     # Multi-GPU is handled automatically when launched with accelerate/torchrun
 )

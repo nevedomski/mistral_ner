@@ -1,14 +1,18 @@
 [project]
 name = "mistral-ner"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fine-tune Mistral-7B for Named Entity Recognition (NER) on the CoNLL-2003 dataset using Hugging Face Transformers."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "accelerate>=1.7.0",
     "datasets>=3.6.0",
+    "evaluate>=0.4.3",
     "numpy>=2.2.5",
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
     "transformers>=4.51.3",
-    "seqeval>=1.2.2",
 ]
 
 [project.urls]
