@@ -13,13 +13,14 @@ tokenizer.pad_token = tokenizer.eos_token  # Set pad token to eos token for Mist
 model = AutoModelForTokenClassification.from_pretrained(
     model_checkpoint, num_labels=dataset["train"].features["ner_tags"].feature.num_classes
 )
+model.gradient_checkpointing_enable()
 
 label_list = dataset["train"].features["ner_tags"].feature.names
 
 
 # 3. Tokenize and align labels
 def tokenize_and_align_labels(examples):
-    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, max_length=128)
     labels = []
     for i, label in enumerate(examples["ner_tags"]):
         word_ids = tokenized_inputs.word_ids(batch_index=i)
@@ -64,11 +65,12 @@ def compute_metrics(p):
 # 6. Training arguments
 training_args = TrainingArguments(
     output_dir="./mistral-ner-finetuned",
-    eval_strategy="epoch",
+    eval_strategy="steps",
+    eval_steps=200,
     save_strategy="epoch",
     learning_rate=2e-5,
-    per_device_train_batch_size=8,  # Adjust as needed for multi-GPU
-    per_device_eval_batch_size=8,
+    per_device_train_batch_size=4,  # Adjust as needed for multi-GPU
+    per_device_eval_batch_size=4,
     num_train_epochs=3,
     weight_decay=0.01,
     logging_dir="./logs",
