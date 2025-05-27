@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""FastAPI server for Mistral NER model."""
+
+import sys
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+import torch
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import uvicorn
+
+# Add parent directory to path
+sys.path.append(str(Path(__file__).parent.parent))
+
+from src.config import Config
+from src.utils import setup_logging
+from scripts.inference import load_model_for_inference, predict_entities
+
+
+# Request/Response models
+class NERRequest(BaseModel):
+    texts: List[str]
+    batch_size: Optional[int] = 1
+
+
+class Entity(BaseModel):
+    text: str
+    type: str
+    start: int
+    end: int
+
+
+class NERResponse(BaseModel):
+    text: str
+    words: List[str]
+    labels: List[str]
+    entities: List[Entity]
+
+
+class HealthResponse(BaseModel):
+    status: str
+    model_loaded: bool
+    device: str
+
+
+# Global variables
+app = FastAPI(title="Mistral NER API", version="1.0.0")
+model = None
+tokenizer = None
+config = None
+device = "cuda" if torch.cuda.is_available() else "cpu"
+logger = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Load model on startup."""
+    global model, tokenizer, config, logger
+    
+    logger = setup_logging()
+    logger.info("Starting Mistral NER API server...")
+    
+    # Load config
+    config_path = Path(__file__).parent.parent / "configs" / "default.yaml"
+    config = Config.from_yaml(str(config_path))
+    
+    # Model path from environment variable or default
+    import os
+    model_path = os.getenv("NER_MODEL_PATH", "./mistral-ner-finetuned-final")
+    base_model = os.getenv("NER_BASE_MODEL", "mistralai/Mistral-7B-v0.3")
+    
+    try:
+        logger.info(f"Loading model from {model_path}")
+        model, tokenizer = load_model_for_inference(
+            model_path=model_path,
+            base_model=base_model,
+            config=config
+        )
+        model.to(device)
+        logger.info("Model loaded successfully")
+    except Exception as e:
+        logger.error(f"Failed to load model: {e}")
+        # Don't fail startup, but model will be None
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint."""
+    return HealthResponse(
+        status="healthy" if model is not None else "unhealthy",
+        model_loaded=model is not None,
+        device=device
+    )
+
+
+@app.post("/predict", response_model=List[NERResponse])
+async def predict(request: NERRequest):
+    """Predict named entities in texts."""
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    if not request.texts:
+        raise HTTPException(status_code=400, detail="No texts provided")
+    
+    if len(request.texts) > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 texts per request")
+    
+    try:
+        # Run prediction
+        predictions = predict_entities(
+            model=model,
+            tokenizer=tokenizer,
+            texts=request.texts,
+            label_names=config.data.label_names,
+            device=device,
+            batch_size=request.batch_size or 1
+        )
+        
+        # Convert to response format
+        responses = []
+        for pred in predictions:
+            responses.append(NERResponse(
+                text=pred['text'],
+                words=pred['words'],
+                labels=pred['labels'],
+                entities=[Entity(**e) for e in pred['entities']]
+            ))
+        
+        return responses
+        
+    except Exception as e:
+        logger.error(f"Prediction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict_simple")
+async def predict_simple(texts: List[str]):
+    """Simple prediction endpoint that returns only entities."""
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    try:
+        predictions = predict_entities(
+            model=model,
+            tokenizer=tokenizer,
+            texts=texts,
+            label_names=config.data.label_names,
+            device=device,
+            batch_size=1
+        )
+        
+        # Return simplified format
+        results = []
+        for pred in predictions:
+            results.append({
+                "text": pred['text'],
+                "entities": pred['entities']
+            })
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Prediction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def main():
+    """Run the API server."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Run Mistral NER API server")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
+    
+    args = parser.parse_args()
+    
+    uvicorn.run(
+        "api.serve:app",
+        host=args.host,
+        port=args.port,
+        reload=args.reload
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -82,3 +82,7 @@ checkpoint-*/
 # System files
 .DS_Store
 Thumbs.db
+
+# Claude configuration
+CLAUDE.md
+.claude

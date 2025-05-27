@@ -1,0 +1,302 @@
+"""Training loop and utilities for Mistral NER fine-tuning."""
+
+import logging
+import os
+from pathlib import Path
+from typing import Optional, Dict, Any, Callable
+import torch
+from transformers import (
+    Trainer,
+    TrainingArguments,
+    TrainerCallback,
+    TrainerState,
+    TrainerControl,
+    EarlyStoppingCallback
+)
+from transformers.integrations import WandbCallback
+import wandb
+from .utils import clear_gpu_cache, check_gpu_memory, detect_mixed_precision_support
+from .evaluation import compute_metrics_factory, load_seqeval_metric
+
+logger = logging.getLogger("mistral_ner")
+
+
+class MemoryCallback(TrainerCallback):
+    """Callback to monitor and manage GPU memory during training."""
+    
+    def __init__(self, clear_cache_steps: int = 50):
+        self.clear_cache_steps = clear_cache_steps
+    
+    def on_step_end(self, args, state, control, **kwargs):
+        """Clear cache periodically to prevent OOM."""
+        if state.global_step % self.clear_cache_steps == 0:
+            clear_gpu_cache()
+            memory_stats = check_gpu_memory()
+            logger.debug(f"Step {state.global_step} - GPU Memory: {memory_stats}")
+    
+    def on_epoch_end(self, args, state, control, **kwargs):
+        """Clear cache at end of epoch."""
+        clear_gpu_cache()
+
+
+class CustomWandbCallback(WandbCallback):
+    """Custom WandB callback with additional logging."""
+    
+    def on_log(self, args, state, control, model=None, logs=None, **kwargs):
+        """Add custom metrics to WandB logs."""
+        if self._wandb is not None and logs is not None:
+            # Add GPU memory stats
+            memory_stats = check_gpu_memory()
+            if not isinstance(memory_stats, dict) or "error" not in memory_stats:
+                for gpu_id, stats in memory_stats.items():
+                    logs[f"gpu/{gpu_id}/memory_used_gb"] = stats["allocated_gb"]
+                    logs[f"gpu/{gpu_id}/memory_util_percent"] = stats["utilization_percent"]
+        
+        super().on_log(args, state, control, model=model, logs=logs, **kwargs)
+
+
+class TrainingManager:
+    """Manages the training process with enhanced features."""
+    
+    def __init__(self, config: Any):
+        self.config = config
+        self.seqeval_metric = load_seqeval_metric()
+        
+    def create_training_arguments(self) -> TrainingArguments:
+        """Create training arguments from config."""
+        # Detect mixed precision support
+        mp_support = detect_mixed_precision_support()
+        
+        # Override config based on hardware support
+        fp16 = self.config.training.fp16 and mp_support["fp16"]
+        bf16 = self.config.training.bf16 and mp_support["bf16"]
+        tf32 = self.config.training.tf32 and mp_support["tf32"]
+        
+        # Ensure only one of fp16/bf16 is True
+        if bf16:
+            fp16 = False
+        
+        logger.info(f"Mixed precision settings - fp16: {fp16}, bf16: {bf16}, tf32: {tf32}")
+        
+        # Create output directory
+        Path(self.config.training.output_dir).mkdir(parents=True, exist_ok=True)
+        
+        training_args = TrainingArguments(
+            output_dir=self.config.training.output_dir,
+            num_train_epochs=self.config.training.num_train_epochs,
+            per_device_train_batch_size=self.config.training.per_device_train_batch_size,
+            per_device_eval_batch_size=self.config.training.per_device_eval_batch_size,
+            gradient_accumulation_steps=self.config.training.gradient_accumulation_steps,
+            gradient_checkpointing=self.config.training.gradient_checkpointing,
+            optim=self.config.training.optim,
+            learning_rate=self.config.training.learning_rate,
+            weight_decay=self.config.training.weight_decay,
+            warmup_ratio=self.config.training.warmup_ratio,
+            max_grad_norm=self.config.training.max_grad_norm,
+            
+            # Evaluation and saving
+            evaluation_strategy=self.config.training.evaluation_strategy,
+            save_strategy=self.config.training.save_strategy,
+            logging_steps=self.config.training.logging_steps,
+            save_total_limit=self.config.training.save_total_limit,
+            load_best_model_at_end=self.config.training.load_best_model_at_end,
+            metric_for_best_model=self.config.training.metric_for_best_model,
+            greater_is_better=self.config.training.greater_is_better,
+            
+            # Mixed precision
+            fp16=fp16,
+            bf16=bf16,
+            tf32=tf32,
+            
+            # Logging
+            report_to=self.config.training.report_to if self.config.logging.use_wandb else [],
+            disable_tqdm=self.config.logging.disable_tqdm,
+            log_level=self.config.logging.log_level,
+            
+            # Other settings
+            seed=self.config.training.seed,
+            data_seed=self.config.training.data_seed,
+            local_rank=self.config.training.local_rank,
+            ddp_find_unused_parameters=self.config.training.ddp_find_unused_parameters,
+            
+            # Hub settings
+            push_to_hub=self.config.training.push_to_hub,
+            hub_model_id=self.config.training.hub_model_id,
+            hub_strategy=self.config.training.hub_strategy,
+        )
+        
+        return training_args
+    
+    def create_trainer(
+        self,
+        model,
+        tokenizer,
+        train_dataset,
+        eval_dataset,
+        data_collator,
+        compute_metrics: Optional[Callable] = None
+    ) -> Trainer:
+        """Create trainer with all components."""
+        # Create training arguments
+        training_args = self.create_training_arguments()
+        
+        # Create compute metrics function if not provided
+        if compute_metrics is None:
+            compute_metrics = compute_metrics_factory(
+                self.config.data.label_names,
+                self.seqeval_metric
+            )
+        
+        # Create callbacks
+        callbacks = [
+            MemoryCallback(clear_cache_steps=self.config.training.clear_cache_steps),
+        ]
+        
+        # Add early stopping callback
+        if self.config.training.early_stopping_patience > 0:
+            callbacks.append(
+                EarlyStoppingCallback(
+                    early_stopping_patience=self.config.training.early_stopping_patience,
+                    early_stopping_threshold=self.config.training.early_stopping_threshold
+                )
+            )
+        
+        # Add WandB callback if enabled
+        if self.config.logging.use_wandb and "wandb" in self.config.training.report_to:
+            callbacks.append(CustomWandbCallback())
+        
+        # Create trainer
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            compute_metrics=compute_metrics,
+            callbacks=callbacks,
+        )
+        
+        return trainer
+    
+    def train(
+        self,
+        trainer: Trainer,
+        resume_from_checkpoint: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Run training with error handling."""
+        try:
+            # Use resume_from_checkpoint from config if not provided
+            if resume_from_checkpoint is None:
+                resume_from_checkpoint = self.config.training.resume_from_checkpoint
+            
+            # Log training start
+            logger.info("Starting training...")
+            if resume_from_checkpoint:
+                logger.info(f"Resuming from checkpoint: {resume_from_checkpoint}")
+            
+            # Start training
+            train_result = trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+            
+            # Log metrics
+            logger.info(f"Training completed. Metrics: {train_result.metrics}")
+            
+            # Save final model
+            if self.config.training.final_output_dir:
+                logger.info(f"Saving final model to {self.config.training.final_output_dir}")
+                trainer.save_model(self.config.training.final_output_dir)
+                trainer.save_state()
+            
+            return train_result.metrics
+            
+        except torch.cuda.OutOfMemoryError as e:
+            logger.error(f"CUDA out of memory during training: {e}")
+            logger.error("Try reducing batch size or sequence length")
+            raise
+            
+        except KeyboardInterrupt:
+            logger.info("Training interrupted by user")
+            # Save checkpoint
+            checkpoint_dir = os.path.join(self.config.training.output_dir, "interrupted_checkpoint")
+            logger.info(f"Saving interrupted checkpoint to {checkpoint_dir}")
+            trainer.save_model(checkpoint_dir)
+            trainer.save_state()
+            raise
+            
+        except Exception as e:
+            logger.error(f"Training failed with error: {e}")
+            raise
+        
+        finally:
+            # Clean up
+            clear_gpu_cache()
+            
+            # Close WandB run if active
+            if wandb.run is not None:
+                wandb.finish()
+
+
+def create_custom_trainer_class(config: Any) -> type:
+    """Create a custom Trainer class with additional features."""
+    
+    class CustomTrainer(Trainer):
+        """Custom trainer with enhanced error handling and logging."""
+        
+        def compute_loss(self, model, inputs, return_outputs=False):
+            """Override compute_loss to add custom error handling."""
+            try:
+                return super().compute_loss(model, inputs, return_outputs)
+            except torch.cuda.OutOfMemoryError:
+                logger.error("OOM in compute_loss, clearing cache and retrying...")
+                clear_gpu_cache()
+                # Try with reduced batch
+                for key in ['input_ids', 'attention_mask', 'labels']:
+                    if key in inputs and hasattr(inputs[key], 'shape'):
+                        batch_size = inputs[key].shape[0]
+                        if batch_size > 1:
+                            # Reduce to half batch size
+                            inputs[key] = inputs[key][:batch_size//2]
+                
+                return super().compute_loss(model, inputs, return_outputs)
+        
+        def evaluation_loop(self, *args, **kwargs):
+            """Override evaluation loop to add memory management."""
+            clear_gpu_cache()
+            result = super().evaluation_loop(*args, **kwargs)
+            clear_gpu_cache()
+            return result
+    
+    return CustomTrainer
+
+
+def run_training_pipeline(
+    model,
+    tokenizer,
+    train_dataset,
+    eval_dataset,
+    data_collator,
+    config: Any
+) -> Dict[str, Any]:
+    """Run complete training pipeline."""
+    # Setup WandB if enabled
+    if config.logging.use_wandb:
+        config.setup_wandb()
+        from .utils import setup_wandb_logging
+        setup_wandb_logging(config)
+    
+    # Create training manager
+    training_manager = TrainingManager(config)
+    
+    # Create trainer
+    trainer = training_manager.create_trainer(
+        model=model,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        data_collator=data_collator
+    )
+    
+    # Run training
+    metrics = training_manager.train(trainer)
+    
+    return metrics

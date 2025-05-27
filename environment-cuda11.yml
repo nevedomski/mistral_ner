@@ -1,0 +1,24 @@
+name: mistral-ner
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pytorch::pytorch>=2.7.0
+  - pytorch::pytorch-cuda=11.8
+  - pytorch::torchaudio>=2.7.0
+  - pytorch::torchvision>=0.22.0
+  - pip:
+    - accelerate>=1.7.0
+    - datasets>=3.6.0
+    - evaluate>=0.4.3
+    - numpy>=2.2.5
+    - protobuf>=6.31.0
+    - peft>=0.4.0
+    - sentencepiece>=0.2.0
+    - seqeval>=1.2.2
+    - transformers>=4.51.3
+    - bitsandbytes>=0.41.0
