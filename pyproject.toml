@@ -42,15 +42,15 @@ dev = [
     "flake8>=6.0.0",
 ]
 cuda11 = [
-    "torch>=2.7.0+cu118",
-    "torchaudio>=2.7.0+cu118",
-    "torchvision>=0.22.0+cu118",
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
     "bitsandbytes>=0.41.0",
 ]
 cuda12 = [
-    "torch>=2.7.0+cu121",
-    "torchaudio>=2.7.0+cu121",
-    "torchvision>=0.22.0+cu121",
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
     "bitsandbytes>=0.41.0",
 ]
 
@@ -59,19 +59,4 @@ Homepage = "https://github.com/nevedomski/mistral-ner"
 Documentation = "https://github.com/nevedomski/mistral-ner#readme"
 
 [tool.uv]
-index-url = "https://pypi.org/simple"
-extra-index-url = ["https://download.pytorch.org/whl/cu121", "https://download.pytorch.org/whl/cu118"]
-
-[tool.uv.sources]
-torch = [
-    { index = "pytorch-cu121", marker = "extra == 'cuda12'" },
-    { index = "pytorch-cu118", marker = "extra == 'cuda11'" }
-]
-torchaudio = [
-    { index = "pytorch-cu121", marker = "extra == 'cuda12'" },
-    { index = "pytorch-cu118", marker = "extra == 'cuda11'" }
-]
-torchvision = [
-    { index = "pytorch-cu121", marker = "extra == 'cuda12'" },
-    { index = "pytorch-cu118", marker = "extra == 'cuda11'" }
-]
+extra-index-url = ["https://download.pytorch.org/whl/cu121"]
