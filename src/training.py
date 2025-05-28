@@ -95,7 +95,7 @@ class TrainingManager:
             max_grad_norm=self.config.training.max_grad_norm,
             
             # Evaluation and saving
-            evaluation_strategy=self.config.training.evaluation_strategy,
+            eval_strategy=self.config.training.eval_strategy,
             save_strategy=self.config.training.save_strategy,
             logging_steps=self.config.training.logging_steps,
             save_total_limit=self.config.training.save_total_limit,

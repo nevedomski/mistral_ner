@@ -66,7 +66,7 @@ class TrainingConfig:
     max_grad_norm: float = 1.0
     
     # Training strategy
-    evaluation_strategy: str = "epoch"
+    eval_strategy: str = "epoch"
     save_strategy: str = "epoch"
     logging_steps: int = 10
     save_total_limit: int = 3
