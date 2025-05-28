@@ -10,9 +10,6 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
 # Set working directory
 WORKDIR /app
 
@@ -21,10 +18,13 @@ COPY pyproject.toml .
 COPY src/ ./src/
 COPY api/ ./api/
 COPY configs/ ./configs/
+COPY scripts/ ./scripts/
 
 # Install dependencies with CUDA support
-RUN uv venv && \
-    uv pip install -e ".[cuda12,api]"
+RUN python3.11 -m venv .venv && \
+    .venv/bin/pip install --upgrade pip && \
+    .venv/bin/pip install -e ".[api]" && \
+    .venv/bin/pip install -e ".[cuda12]" --extra-index-url https://download.pytorch.org/whl/cu121
 
 # Download model (optional - can be mounted as volume instead)
 # RUN python -c "from transformers import AutoModelForTokenClassification, AutoTokenizer; \
