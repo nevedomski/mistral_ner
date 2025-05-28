@@ -47,7 +47,7 @@ jobs:
     
     - name: Install dependencies with CUDA
       run: |
-        uv pip install --system -e ".[cuda12]"
+        uv pip install --system -e ".[cuda12]" --extra-index-url https://download.pytorch.org/whl/cu121
     
     - name: Set up Weights & Biases
       env:
