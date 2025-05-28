@@ -69,14 +69,14 @@ def get_installation_command(env_info):
         # CPU-only installation
         return "uv pip install .[cpu]", "cpu"
     elif cuda_version >= 12.0:
-        # CUDA 12.x - install with PyTorch CUDA index
+        # CUDA 12.x
         return "uv pip install .[cuda12] --extra-index-url https://download.pytorch.org/whl/cu121", "cuda12"
     elif cuda_version >= 11.0:
-        # CUDA 11.x - install with PyTorch CUDA index  
+        # CUDA 11.x
         return "uv pip install .[cuda11] --extra-index-url https://download.pytorch.org/whl/cu118", "cuda11"
     else:
         # Generic CUDA (older versions)
-        return "uv pip install .[cuda]", "cuda"
+        return "uv pip install .[cuda] --extra-index-url https://download.pytorch.org/whl/cu121", "cuda"
 
 
 def main():

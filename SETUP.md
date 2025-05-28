@@ -29,19 +29,19 @@ Based on your CUDA version, use one of these commands:
 **CUDA 11.x:**
 
 ```bash
-uv pip install .[cuda11]
+uv pip install .[cuda11] --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
 **CUDA 12.x:**
 
 ```bash
-uv pip install .[cuda12]
+uv pip install .[cuda12] --extra-index-url https://download.pytorch.org/whl/cu121
 ```
 
 **Generic CUDA (auto-detect):**
 
 ```bash
-uv pip install .[cuda]
+uv pip install .[cuda] --extra-index-url https://download.pytorch.org/whl/cu121
 ```
 
 #### Option B: Using Conda
@@ -148,7 +148,7 @@ FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 RUN apt-get update && apt-get install -y python3.11 python3-pip
 COPY . /app
 WORKDIR /app
-RUN pip install uv && uv pip install .[cuda12]
+RUN pip install uv && uv pip install .[cuda12] --extra-index-url https://download.pytorch.org/whl/cu121
 ```
 
 ## GPU Memory Requirements
