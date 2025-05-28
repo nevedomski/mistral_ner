@@ -57,6 +57,3 @@ cuda12 = [
 [project.urls]
 Homepage = "https://github.com/nevedomski/mistral-ner"
 Documentation = "https://github.com/nevedomski/mistral-ner#readme"
-
-[tool.uv]
-extra-index-url = ["https://download.pytorch.org/whl/cu121"]

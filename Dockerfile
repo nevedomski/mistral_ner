@@ -24,7 +24,7 @@ COPY configs/ ./configs/
 
 # Install dependencies with CUDA support
 RUN uv venv && \
-    uv pip install -e ".[cuda12,api]"
+    uv pip install -e ".[cuda12,api]" --extra-index-url https://download.pytorch.org/whl/cu121
 
 # Download model (optional - can be mounted as volume instead)
 # RUN python -c "from transformers import AutoModelForTokenClassification, AutoTokenizer; \
