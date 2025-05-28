@@ -3,7 +3,6 @@
 import logging
 from typing import Dict, List, Tuple, Any
 import numpy as np
-from datasets import load_metric
 import evaluate
 from seqeval.metrics import classification_report, f1_score, precision_score, recall_score, accuracy_score
 import torch
