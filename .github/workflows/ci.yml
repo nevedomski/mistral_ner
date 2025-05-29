@@ -27,14 +27,14 @@ jobs:
         run: |
           uv pip install --system -e ".[dev]"
 
-      - name: Run Black
-        run: black --check src/ tests/ scripts/ api/
+      - name: Run ruff linting
+        run: ruff check src/ tests/ scripts/ api/
 
-      - name: Run isort
-        run: isort --check-only src/ tests/ scripts/ api/
+      - name: Run ruff formatting
+        run: ruff format --check src/ tests/ scripts/ api/
 
-      - name: Run Flake8
-        run: flake8 src/ tests/ scripts/ api/
+      - name: Run mypy type checking
+        run: mypy src/ tests/ scripts/ api/
 
   test:
     runs-on: ubuntu-latest
