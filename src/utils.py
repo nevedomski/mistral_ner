@@ -266,7 +266,7 @@ def sync_offline_run(run_path: str) -> bool:
     try:
         # Use wandb sync command
         import subprocess
-        result = subprocess.run(
+        _ = subprocess.run(
             ["wandb", "sync", run_path],
             capture_output=True,
             text=True,
