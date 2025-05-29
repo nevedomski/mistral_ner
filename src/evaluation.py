@@ -1,18 +1,26 @@
 """Evaluation metrics and functions for NER."""
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Any, Callable
 
 import evaluate
 import numpy as np
 import torch
 import wandb
+from datasets import Dataset
 from seqeval.metrics import accuracy_score, classification_report, f1_score, precision_score, recall_score
-from transformers import EvalPrediction, PreTrainedTokenizer
+from transformers import EvalPrediction, PreTrainedModel, PreTrainedTokenizerBase
+
+if TYPE_CHECKING:
+    from evaluate import EvaluationModule
+    from transformers import DataCollatorForTokenClassification
 
 logger = logging.getLogger("mistral_ner")
 
 
-def load_seqeval_metric():
+def load_seqeval_metric() -> EvaluationModule | None:
     """Load the seqeval metric for NER evaluation."""
     try:
         return evaluate.load("seqeval")
@@ -58,7 +66,9 @@ def align_predictions(
     return true_labels, pred_labels
 
 
-def compute_metrics_factory(label_names: list[str], seqeval_metric=None):
+def compute_metrics_factory(
+    label_names: list[str], seqeval_metric: EvaluationModule | None = None
+) -> Callable[[EvalPrediction], dict[str, float]]:
     """
     Factory function to create compute_metrics function with label names.
 
@@ -122,7 +132,12 @@ def compute_metrics_factory(label_names: list[str], seqeval_metric=None):
 
 
 def evaluate_model(
-    model, eval_dataset, data_collator, tokenizer: PreTrainedTokenizer, label_names: list[str], batch_size: int = 8
+    model: PreTrainedModel,
+    eval_dataset: Dataset,
+    data_collator: DataCollatorForTokenClassification,
+    tokenizer: PreTrainedTokenizerBase,
+    label_names: list[str],
+    batch_size: int = 8,
 ) -> dict[str, float]:
     """
     Evaluate model on a dataset.
@@ -154,7 +169,7 @@ def evaluate_model(
     with torch.no_grad():
         for batch in eval_dataloader:
             # Move batch to device
-            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            batch: dict[str, Any] = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
             # Forward pass
             outputs = model(**batch)

@@ -1,23 +1,34 @@
 """Training loop and utilities for Mistral NER fine-tuning."""
 
+from __future__ import annotations
+
 import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 import wandb
+from datasets import Dataset
 from transformers import (
     EarlyStoppingCallback,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
     Trainer,
     TrainerCallback,
+    TrainerControl,
+    TrainerState,
     TrainingArguments,
 )
 from transformers.integrations import WandbCallback
 
 from .evaluation import compute_metrics_factory, load_seqeval_metric
 from .utils import check_gpu_memory, clear_gpu_cache, detect_mixed_precision_support
+
+if TYPE_CHECKING:
+    from transformers import DataCollatorForTokenClassification
+    from .config import Config
 
 logger = logging.getLogger("mistral_ner")
 
@@ -28,14 +39,18 @@ class MemoryCallback(TrainerCallback):
     def __init__(self, clear_cache_steps: int = 50):
         self.clear_cache_steps = clear_cache_steps
 
-    def on_step_end(self, args, state, control, **kwargs):
+    def on_step_end(
+        self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs: Any
+    ) -> None:
         """Clear cache periodically to prevent OOM."""
         if state.global_step % self.clear_cache_steps == 0:
             clear_gpu_cache()
             memory_stats = check_gpu_memory()
             logger.debug(f"Step {state.global_step} - GPU Memory: {memory_stats}")
 
-    def on_epoch_end(self, args, state, control, **kwargs):
+    def on_epoch_end(
+        self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs: Any
+    ) -> None:
         """Clear cache at end of epoch."""
         clear_gpu_cache()
 
@@ -43,7 +58,15 @@ class MemoryCallback(TrainerCallback):
 class CustomWandbCallback(WandbCallback):
     """Custom WandB callback with additional logging."""
 
-    def on_log(self, args, state, control, model=None, logs=None, **kwargs):
+    def on_log(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        model: PreTrainedModel | None = None,
+        logs: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Add custom metrics to WandB logs."""
         if self._wandb is not None and logs is not None:
             # Add GPU memory stats
@@ -59,7 +82,7 @@ class CustomWandbCallback(WandbCallback):
 class TrainingManager:
     """Manages the training process with enhanced features."""
 
-    def __init__(self, config: Any):
+    def __init__(self, config: Config) -> None:
         self.config = config
         self.seqeval_metric = load_seqeval_metric()
 
@@ -124,7 +147,13 @@ class TrainingManager:
         return training_args
 
     def create_trainer(
-        self, model, tokenizer, train_dataset, eval_dataset, data_collator, compute_metrics: Callable | None = None
+        self,
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizerBase,
+        train_dataset: Dataset,
+        eval_dataset: Dataset,
+        data_collator: DataCollatorForTokenClassification,
+        compute_metrics: Callable[[Any], dict[str, float]] | None = None,
     ) -> Trainer:
         """Create trainer with all components."""
         # Create training arguments
@@ -219,13 +248,15 @@ class TrainingManager:
                 wandb.finish()
 
 
-def create_custom_trainer_class(config: Any) -> type:
+def create_custom_trainer_class(config: Config) -> type[Trainer]:
     """Create a custom Trainer class with additional features."""
 
     class CustomTrainer(Trainer):
         """Custom trainer with enhanced error handling and logging."""
 
-        def compute_loss(self, model, inputs, return_outputs=False):
+        def compute_loss(
+            self, model: PreTrainedModel, inputs: dict[str, Any], return_outputs: bool = False
+        ) -> torch.Tensor | tuple[torch.Tensor, Any]:
             """Override compute_loss to add custom error handling."""
             try:
                 return super().compute_loss(model, inputs, return_outputs)
@@ -242,7 +273,7 @@ def create_custom_trainer_class(config: Any) -> type:
 
                 return super().compute_loss(model, inputs, return_outputs)
 
-        def evaluation_loop(self, *args, **kwargs):
+        def evaluation_loop(self, *args: Any, **kwargs: Any) -> Any:
             """Override evaluation loop to add memory management."""
             clear_gpu_cache()
             result = super().evaluation_loop(*args, **kwargs)
@@ -252,7 +283,14 @@ def create_custom_trainer_class(config: Any) -> type:
     return CustomTrainer
 
 
-def run_training_pipeline(model, tokenizer, train_dataset, eval_dataset, data_collator, config: Any) -> dict[str, Any]:
+def run_training_pipeline(
+    model: PreTrainedModel,
+    tokenizer: PreTrainedTokenizerBase,
+    train_dataset: Dataset,
+    eval_dataset: Dataset,
+    data_collator: DataCollatorForTokenClassification,
+    config: Config,
+) -> dict[str, Any]:
     """Run complete training pipeline."""
     # Setup WandB if enabled
     if config.logging.use_wandb:

@@ -1,11 +1,17 @@
 """Data loading and processing for Mistral NER fine-tuning."""
 
+from __future__ import annotations
+
 import logging
 from functools import partial
-from typing import Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from datasets import Dataset, DatasetDict, load_dataset
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizerBase
+
+if TYPE_CHECKING:
+    from transformers import DataCollatorForTokenClassification
+    from .config import Config
 
 logger = logging.getLogger("mistral_ner")
 
@@ -48,7 +54,7 @@ def validate_dataset(dataset: DatasetDict, expected_labels: list[str]) -> None:
 
 
 def tokenize_and_align_labels(
-    examples: dict[str, Any], tokenizer: PreTrainedTokenizer, max_length: int = 256, label_all_tokens: bool = False
+    examples: dict[str, Any], tokenizer: PreTrainedTokenizerBase, max_length: int = 256, label_all_tokens: bool = False
 ) -> dict[str, Any]:
     """
     Tokenize text and align labels with tokens.
@@ -96,7 +102,7 @@ def tokenize_and_align_labels(
     return tokenized_inputs
 
 
-def create_data_collator(tokenizer: PreTrainedTokenizer):
+def create_data_collator(tokenizer: PreTrainedTokenizerBase) -> DataCollatorForTokenClassification:
     """Create a data collator for token classification."""
     from transformers import DataCollatorForTokenClassification
 
@@ -105,7 +111,9 @@ def create_data_collator(tokenizer: PreTrainedTokenizer):
     )
 
 
-def prepare_datasets(tokenizer: PreTrainedTokenizer, config: Any, dataset: DatasetDict | None = None) -> tuple:
+def prepare_datasets(
+    tokenizer: PreTrainedTokenizerBase, config: Config, dataset: DatasetDict | None = None
+) -> tuple[Dataset, Dataset, Dataset, DataCollatorForTokenClassification]:
     """
     Prepare datasets for training.
 
@@ -125,7 +133,7 @@ def prepare_datasets(tokenizer: PreTrainedTokenizer, config: Any, dataset: Datas
     validate_dataset(dataset, config.data.label_names)
 
     # Create tokenization function with fixed parameters
-    tokenize_fn = partial(
+    tokenize_fn: Callable[[dict[str, Any]], dict[str, Any]] = partial(
         tokenize_and_align_labels,
         tokenizer=tokenizer,
         max_length=config.data.max_length,
@@ -144,7 +152,7 @@ def prepare_datasets(tokenizer: PreTrainedTokenizer, config: Any, dataset: Datas
     return (tokenized_datasets["train"], tokenized_datasets["validation"], tokenized_datasets["test"], data_collator)
 
 
-def create_sample_dataset(size: int = 100, config: Any = None) -> DatasetDict:
+def create_sample_dataset(size: int = 100, config: Config | None = None) -> DatasetDict:
     """Create a small sample dataset for testing."""
 
     if config is None:
@@ -152,7 +160,7 @@ def create_sample_dataset(size: int = 100, config: Any = None) -> DatasetDict:
     else:
         label_names = config.data.label_names
 
-    def generate_sample(idx):
+    def generate_sample(idx: int) -> dict[str, Any]:
         tokens = ["This", "is", "a", "test", "sentence", "with", "John", "Smith", "in", "New", "York", "."]
         ner_tags = [0, 0, 0, 0, 0, 0, 1, 2, 0, 5, 6, 0]  # Example tags
 
@@ -185,7 +193,7 @@ def get_label_list(dataset: DatasetDict) -> list[str]:
         return ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
 
 
-def print_dataset_statistics(dataset: DatasetDict, tokenizer: PreTrainedTokenizer = None) -> None:
+def print_dataset_statistics(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase | None = None) -> None:
     """Print statistics about the dataset."""
     print("\n" + "=" * 50)
     print("Dataset Statistics")
