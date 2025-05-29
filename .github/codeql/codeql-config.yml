@@ -1,0 +1,31 @@
+name: "ML Security Config"
+
+# Use security-extended for comprehensive ML library coverage
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+# Exclude test and notebook files from analysis
+paths-ignore:
+  - tests
+  - notebooks
+  - "**/*_test.py"
+  - "**/*.ipynb"
+  - data
+  - models
+  - mlruns
+  - logs
+  - wandb
+  - __pycache__
+  - .git
+  - .venv
+  - build
+  - dist
+
+# Include ML-specific security queries
+packs:
+  - codeql/python-queries
+
+# Custom query paths (if any)
+# query-paths:
+#   - .github/codeql/custom-queries
