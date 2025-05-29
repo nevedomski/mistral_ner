@@ -1,5 +1,7 @@
 # Mistral NER Fine-tuning
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Fine-tune Mistral-7B for Named Entity Recognition (NER) on the CoNLL-2003 dataset using 8-bit quantization and LoRA for memory-efficient training.
 
 ## Features
@@ -40,7 +42,7 @@ mistral_ner/
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mistral_ner.git
+git clone https://github.com/nevedomski/mistral_ner.git
 cd mistral_ner
 
 # Run automated setup (detects CUDA version)
@@ -213,9 +215,9 @@ If you use this code in your research, please cite:
 
 ```bibtex
 @software{mistral_ner,
-  author = {Your Name},
+  author = {Sergei Nevedomski},
   title = {Mistral NER: Efficient Fine-tuning for Named Entity Recognition},
   year = {2024},
-  url = {https://github.com/yourusername/mistral_ner}
+  url = {https://github.com/nevedomski/mistral_ner}
 }
 ```
