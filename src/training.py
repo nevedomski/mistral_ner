@@ -28,6 +28,7 @@ from .utils import check_gpu_memory, clear_gpu_cache, detect_mixed_precision_sup
 
 if TYPE_CHECKING:
     from transformers import DataCollatorForTokenClassification
+
     from .config import Config
 
 logger = logging.getLogger("mistral_ner")
@@ -39,9 +40,7 @@ class MemoryCallback(TrainerCallback):
     def __init__(self, clear_cache_steps: int = 50):
         self.clear_cache_steps = clear_cache_steps
 
-    def on_step_end(
-        self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs: Any
-    ) -> None:
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs: Any) -> None:
         """Clear cache periodically to prevent OOM."""
         if state.global_step % self.clear_cache_steps == 0:
             clear_gpu_cache()
