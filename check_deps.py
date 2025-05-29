@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Check available dependencies."""
 
-import sys
-
 dependencies = [
     "torch",
-    "transformers", 
+    "transformers",
     "peft",
     "datasets",
     "accelerate",
@@ -18,7 +16,7 @@ dependencies = [
     "wandb",
     "fastapi",
     "uvicorn",
-    "pydantic"
+    "pydantic",
 ]
 
 print("Checking dependencies:")
