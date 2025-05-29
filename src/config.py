@@ -119,13 +119,17 @@ class LoggingConfig:
     disable_tqdm: bool = False
 
     # WandB configuration
+    use_wandb: bool = True
     wandb_project: str = "mistral-ner"
     wandb_entity: str | None = None
     wandb_name: str | None = None
     wandb_tags: list[str] = field(default_factory=list)
     wandb_notes: str | None = None
     wandb_mode: str = "online"  # online, offline, disabled
-    use_wandb: bool = True
+    wandb_dir: str = "./wandb"  # Directory for offline runs
+    wandb_resume: str = "allow"  # allow, must, never, auto
+    wandb_run_id: str | None = None  # For resuming specific runs
+    wandb_api_key: str | None = None  # API key (can be set via env var)
 
 
 @dataclass
@@ -194,21 +198,64 @@ class Config:
             self.training.resume_from_checkpoint = args.resume_from_checkpoint
 
         # Update logging config
-        if hasattr(args, "use_wandb"):
+        if hasattr(args, "use_wandb") and args.use_wandb is not None:
             self.logging.use_wandb = args.use_wandb
         if hasattr(args, "wandb_project") and args.wandb_project:
             self.logging.wandb_project = args.wandb_project
+        if hasattr(args, "wandb_entity") and args.wandb_entity:
+            self.logging.wandb_entity = args.wandb_entity
+        if hasattr(args, "wandb_name") and args.wandb_name:
+            self.logging.wandb_name = args.wandb_name
+        if hasattr(args, "wandb_mode") and args.wandb_mode:
+            self.logging.wandb_mode = args.wandb_mode
+        if hasattr(args, "wandb_dir") and args.wandb_dir:
+            self.logging.wandb_dir = args.wandb_dir
+        if hasattr(args, "wandb_resume") and args.wandb_resume:
+            self.logging.wandb_resume = args.wandb_resume
+        if hasattr(args, "wandb_run_id") and args.wandb_run_id:
+            self.logging.wandb_run_id = args.wandb_run_id
+        if hasattr(args, "wandb_tags") and args.wandb_tags:
+            self.logging.wandb_tags = args.wandb_tags
+        if hasattr(args, "wandb_notes") and args.wandb_notes:
+            self.logging.wandb_notes = args.wandb_notes
 
     def setup_wandb(self) -> None:
         """Setup WandB based on configuration."""
+        from .utils import validate_wandb_config
+        
+        # Validate configuration first
+        validate_wandb_config(self.logging)
+        
         if self.logging.use_wandb and self.logging.wandb_mode != "disabled":
+            # Ensure wandb directory exists
+            os.makedirs(self.logging.wandb_dir, exist_ok=True)
+            
+            # Set core environment variables
             os.environ["WANDB_PROJECT"] = self.logging.wandb_project
             os.environ["WANDB_MODE"] = self.logging.wandb_mode
-
+            os.environ["WANDB_DIR"] = self.logging.wandb_dir
+            
+            # Set optional configuration
             if self.logging.wandb_entity:
                 os.environ["WANDB_ENTITY"] = self.logging.wandb_entity
+            if self.logging.wandb_name:
+                os.environ["WANDB_NAME"] = self.logging.wandb_name
+            if self.logging.wandb_notes:
+                os.environ["WANDB_NOTES"] = self.logging.wandb_notes
+            if self.logging.wandb_run_id:
+                os.environ["WANDB_RUN_ID"] = self.logging.wandb_run_id
+            if self.logging.wandb_api_key:
+                os.environ["WANDB_API_KEY"] = self.logging.wandb_api_key
+                
+            # Set resume strategy
+            os.environ["WANDB_RESUME"] = self.logging.wandb_resume
+            
+            # Set tags if provided
+            if self.logging.wandb_tags:
+                os.environ["WANDB_TAGS"] = ",".join(self.logging.wandb_tags)
         else:
             os.environ["WANDB_DISABLED"] = "true"
+            os.environ["WANDB_MODE"] = "disabled"
             # Remove wandb from report_to if disabled
             if "wandb" in self.training.report_to:
                 self.training.report_to.remove("wandb")
