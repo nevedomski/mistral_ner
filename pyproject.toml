@@ -139,6 +139,12 @@ pretty = true
 show_error_codes = true
 show_column_numbers = true
 
+# Performance optimizations
+fast_module_lookup = true
+incremental = true
+cache_dir = ".mypy_cache"
+sqlite_cache = true
+
 # Gradual typing - start with src/ only
 files = ["src/**/*.py", "scripts/**/*.py", "api/**/*.py"]
 exclude = ["tests", "notebooks", "build", "dist", "test_run.py"]
@@ -149,18 +155,34 @@ plugins = ["pydantic.mypy"]  # For config validation
 # Per-module overrides for ML libraries
 [[tool.mypy.overrides]]
 module = [
+    "transformers",
     "transformers.*",
+    "datasets",
     "datasets.*",
+    "torch",
     "torch.*",
+    "torchvision",
+    "torchvision.*",
+    "torchaudio",
+    "torchaudio.*",
+    "accelerate",
     "accelerate.*",
+    "peft",
     "peft.*",
+    "bitsandbytes",
     "bitsandbytes.*",
+    "wandb",
     "wandb.*",
+    "seqeval",
     "seqeval.*",
+    "sentencepiece",
     "sentencepiece.*",
+    "evaluate",
     "evaluate.*",
 ]
+follow_imports = "skip"
 ignore_missing_imports = true
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "numpy.*"

@@ -79,7 +79,7 @@ def clear_gpu_cache() -> None:
         torch.cuda.synchronize()
 
 
-def check_gpu_memory() -> dict[str, float]:
+def check_gpu_memory() -> dict[str, Any]:
     """Check GPU memory usage."""
     if not torch.cuda.is_available():
         return {"error": "CUDA not available"}
@@ -195,7 +195,7 @@ def setup_wandb_logging(config: Config) -> None:
             tags=config.logging.wandb_tags,
             notes=config.logging.wandb_notes,
             config=wandb_config,
-            mode=config.logging.wandb_mode,
+            mode=config.logging.wandb_mode,  # type: ignore[arg-type]
         )
 
 
