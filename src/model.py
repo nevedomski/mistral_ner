@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import gc
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import torch
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model

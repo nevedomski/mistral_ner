@@ -1,0 +1,70 @@
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    # Run at 3:17 AM UTC every Monday (randomized time to reduce load)
+    - cron: '17 3 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    permissions:
+      security-events: write
+      contents: read
+      actions: read  # For workflow analysis
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python', 'yaml' ]  # Analyze Python code and GitHub Actions workflows
+        
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        config-file: ./.github/codeql/codeql-config.yml
+        # Override built-in queries with security-extended suite
+        queries: security-extended,security-and-quality
+
+    # Set up Python for better analysis of ML libraries
+    - name: Set up Python
+      if: matrix.language == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install uv
+      if: matrix.language == 'python'
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+
+    # Install dependencies for better code analysis
+    - name: Install Python dependencies
+      if: matrix.language == 'python'
+      run: |
+        uv pip install --system -e ".[dev]"
+
+    # Autobuild attempts to build any compiled languages (C/C++, C#, Go, Java, or Swift).
+    # For Python, this step is not needed but doesn't hurt
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+        # Upload results even if there are findings
+        upload: true

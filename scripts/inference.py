@@ -12,7 +12,9 @@ import torch
 
 if TYPE_CHECKING:
     from argparse import Namespace
+
     from transformers import PreTrainedModel, PreTrainedTokenizerBase
+
     from src.config import Config
 
 # Add parent directory to path

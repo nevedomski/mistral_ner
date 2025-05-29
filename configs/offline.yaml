@@ -1,4 +1,5 @@
-# Default configuration for Mistral NER fine-tuning
+# Offline configuration for Mistral NER fine-tuning
+# This configuration runs training in offline mode for later syncing
 
 model:
   model_name: "mistralai/Mistral-7B-v0.3"
@@ -92,15 +93,17 @@ logging:
   log_dir: "./logs"
   disable_tqdm: false
   
-  # WandB configuration
+  # WandB configuration - OFFLINE MODE
   use_wandb: true
   wandb_project: "mistral-ner"
-  wandb_entity: null  # Set via WANDB_ENTITY env var or specify here
-  wandb_name: null    # Auto-generated if not specified
-  wandb_tags: []      # Add tags like ["experiment", "baseline"]
-  wandb_notes: null   # Add experiment notes
-  wandb_mode: "online"  # online, offline, disabled
-  wandb_dir: "./wandb"  # Directory for offline runs
-  wandb_resume: "allow"  # allow, must, never, auto
-  wandb_run_id: null  # For resuming specific runs
-  wandb_api_key: null  # Set via WANDB_API_KEY env var or specify here
+  wandb_entity: null
+  wandb_name: "offline-training"
+  wandb_tags: 
+    - "offline"
+    - "experiment"
+  wandb_notes: "Training run in offline mode for later syncing"
+  wandb_mode: "offline"  # OFFLINE MODE
+  wandb_dir: "./wandb"
+  wandb_resume: "allow"
+  wandb_run_id: null
+  wandb_api_key: null

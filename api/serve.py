@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from transformers import PreTrainedModel, PreTrainedTokenizerBase
+
     from src.config import Config
 
 # Add parent directory to path

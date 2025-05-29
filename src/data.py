@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from datasets import Dataset, DatasetDict, load_dataset
 from transformers import PreTrainedTokenizerBase
 
 if TYPE_CHECKING:
     from transformers import DataCollatorForTokenClassification
+
     from .config import Config
 
 logger = logging.getLogger("mistral_ner")
@@ -158,7 +160,7 @@ def create_sample_dataset(size: int = 100, config: Config | None = None) -> Data
     if config is None:
         label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
     else:
-        label_names = config.data.label_names
+        label_names = config.data.label_names  # noqa: F841
 
     def generate_sample(idx: int) -> dict[str, Any]:
         tokens = ["This", "is", "a", "test", "sentence", "with", "John", "Smith", "in", "New", "York", "."]
