@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -14,7 +15,34 @@ from peft import PeftModel
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 if TYPE_CHECKING:
-    from .config import Config
+    from .config import Config, LoggingConfig
+
+
+def validate_wandb_config(logging_config: LoggingConfig) -> None:
+    """Validate WandB configuration and auto-adjust if needed."""
+    import warnings
+    
+    # Validate mode
+    valid_modes = {"online", "offline", "disabled"}
+    if logging_config.wandb_mode not in valid_modes:
+        raise ValueError(f"wandb_mode must be one of {valid_modes}, got {logging_config.wandb_mode}")
+    
+    # Validate resume strategy
+    valid_resume = {"allow", "must", "never", "auto"}
+    if logging_config.wandb_resume not in valid_resume:
+        raise ValueError(f"wandb_resume must be one of {valid_resume}, got {logging_config.wandb_resume}")
+    
+    # Auto-fallback to offline if no API key and online mode
+    if logging_config.wandb_mode == "online":
+        api_key = logging_config.wandb_api_key or os.getenv("WANDB_API_KEY")
+        if not api_key:
+            warnings.warn(
+                "WANDB_API_KEY not found and no api key provided. "
+                "Switching to offline mode for this session.",
+                UserWarning,
+                stacklevel=2
+            )
+            logging_config.wandb_mode = "offline"
 
 
 def setup_logging(log_level: str = "info", log_dir: str = "./logs") -> logging.Logger:
@@ -172,8 +200,11 @@ def load_checkpoint(
 
 
 def setup_wandb_logging(config: Config) -> None:
-    """Setup Weights & Biases logging."""
+    """Setup Weights & Biases logging with enhanced offline support."""
     if config.logging.use_wandb and config.logging.wandb_mode != "disabled":
+        # Validate configuration first
+        validate_wandb_config(config.logging)
+        
         wandb_config = {
             "model_name": config.model.model_name,
             "num_train_epochs": config.training.num_train_epochs,
@@ -188,15 +219,77 @@ def setup_wandb_logging(config: Config) -> None:
             "max_length": config.data.max_length,
         }
 
-        wandb.init(
-            project=config.logging.wandb_project,
-            entity=config.logging.wandb_entity,
-            name=config.logging.wandb_name,
-            tags=config.logging.wandb_tags,
-            notes=config.logging.wandb_notes,
-            config=wandb_config,
-            mode=config.logging.wandb_mode,
+        # Prepare wandb.init parameters
+        init_params = {
+            "project": config.logging.wandb_project,
+            "entity": config.logging.wandb_entity,
+            "name": config.logging.wandb_name,
+            "tags": config.logging.wandb_tags,
+            "notes": config.logging.wandb_notes,
+            "config": wandb_config,
+            "mode": config.logging.wandb_mode,
+            "dir": config.logging.wandb_dir,
+            "resume": config.logging.wandb_resume,
+        }
+        
+        # Add run_id if specified for resuming
+        if config.logging.wandb_run_id:
+            init_params["id"] = config.logging.wandb_run_id
+            
+        wandb.init(**init_params)
+
+
+def list_offline_runs(wandb_dir: str = "./wandb") -> list[dict[str, Any]]:
+    """List all offline WandB runs in the specified directory."""
+    wandb_path = Path(wandb_dir)
+    offline_runs = []
+    
+    if not wandb_path.exists():
+        return offline_runs
+    
+    # Look for offline run directories
+    for run_dir in wandb_path.iterdir():
+        if run_dir.is_dir() and run_dir.name.startswith("offline-run-"):
+            run_info = {
+                "run_id": run_dir.name,
+                "path": str(run_dir),
+                "created": run_dir.stat().st_ctime,
+                "size_mb": sum(f.stat().st_size for f in run_dir.rglob("*") if f.is_file()) / (1024 * 1024)
+            }
+            offline_runs.append(run_info)
+    
+    return sorted(offline_runs, key=lambda x: x["created"], reverse=True)
+
+
+def sync_offline_run(run_path: str) -> bool:
+    """Sync a specific offline run to WandB servers."""
+    try:
+        # Use wandb sync command
+        import subprocess
+        result = subprocess.run(
+            ["wandb", "sync", run_path],
+            capture_output=True,
+            text=True,
+            check=True
         )
+        return True
+    except subprocess.CalledProcessError as e:
+        logging.getLogger("mistral_ner").error(f"Failed to sync run {run_path}: {e}")
+        return False
+
+
+def sync_all_offline_runs(wandb_dir: str = "./wandb") -> dict[str, Any]:
+    """Sync all offline runs to WandB servers."""
+    offline_runs = list_offline_runs(wandb_dir)
+    results = {"synced": [], "failed": []}
+    
+    for run in offline_runs:
+        if sync_offline_run(run["path"]):
+            results["synced"].append(run["run_id"])
+        else:
+            results["failed"].append(run["run_id"])
+    
+    return results
 
 
 def get_compute_dtype() -> torch.dtype:

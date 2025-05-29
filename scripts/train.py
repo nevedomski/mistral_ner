@@ -54,6 +54,16 @@ def parse_args() -> Namespace:
     parser.add_argument("--use-wandb", action="store_true", help="Use Weights & Biases for logging")
     parser.add_argument("--no-wandb", dest="use_wandb", action="store_false", help="Disable Weights & Biases logging")
     parser.add_argument("--wandb-project", type=str, help="WandB project name (overrides config)")
+    parser.add_argument("--wandb-entity", type=str, help="WandB entity name (overrides config)")
+    parser.add_argument("--wandb-name", type=str, help="WandB run name (overrides config)")
+    parser.add_argument("--wandb-mode", type=str, choices=["online", "offline", "disabled"], 
+                      help="WandB mode (overrides config)")
+    parser.add_argument("--wandb-dir", type=str, help="WandB directory for offline runs (overrides config)")
+    parser.add_argument("--wandb-resume", type=str, choices=["allow", "must", "never", "auto"],
+                      help="WandB resume strategy (overrides config)")
+    parser.add_argument("--wandb-run-id", type=str, help="WandB run ID for resuming (overrides config)")
+    parser.add_argument("--wandb-tags", type=str, nargs="+", help="WandB tags (overrides config)")
+    parser.add_argument("--wandb-notes", type=str, help="WandB notes (overrides config)")
 
     # Other arguments
     parser.add_argument("--eval-only", action="store_true", help="Only run evaluation, no training")
