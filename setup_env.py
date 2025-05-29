@@ -107,6 +107,9 @@ def main():
         print(f"\n📦 Recommended installation command:")
         print(f"\n    {install_cmd}\n")
         
+        print("💡 For API server functionality, also install:")
+        print("    uv pip install .[api]\n")
+        
         if env_info['is_conda']:
             print("💡 For conda environments, you can also use:")
             print(f"    conda env create -f environment-{env_type}.yml")
