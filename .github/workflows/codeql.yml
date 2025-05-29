@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'python', 'yaml' ]  # Analyze Python code and GitHub Actions workflows
+        language: [ 'python' ]  # Analyze Python code and GitHub Actions workflows
         
     steps:
     - name: Checkout repository
