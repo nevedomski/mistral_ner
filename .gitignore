@@ -84,5 +84,10 @@ checkpoint-*/
 Thumbs.db
 
 # Claude configuration
+CLAUDE.local.md
 CLAUDE.md
 .claude
+
+# git
+mistral_ner_agents/
+

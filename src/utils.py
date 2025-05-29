@@ -1,15 +1,20 @@
 """Utility functions for Mistral NER fine-tuning."""
 
+from __future__ import annotations
+
 import gc
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 import wandb
 from peft import PeftModel
-from transformers import PreTrainedModel
+from transformers import PreTrainedModel, PreTrainedTokenizerBase
+
+if TYPE_CHECKING:
+    from .config import Config
 
 
 def setup_logging(log_level: str = "info", log_dir: str = "./logs") -> logging.Logger:
@@ -115,7 +120,9 @@ def detect_mixed_precision_support() -> dict[str, bool]:
     return support
 
 
-def save_model_and_tokenizer(model: PreTrainedModel, tokenizer, output_dir: str, is_peft: bool = True) -> None:
+def save_model_and_tokenizer(
+    model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, output_dir: str | Path, is_peft: bool = True
+) -> None:
     """Save model and tokenizer to disk."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -132,7 +139,13 @@ def save_model_and_tokenizer(model: PreTrainedModel, tokenizer, output_dir: str,
     print(f"Model and tokenizer saved to {output_dir}")
 
 
-def load_checkpoint(checkpoint_path: str, model_class, tokenizer_class, config: Any, device_map: str = "auto") -> tuple:
+def load_checkpoint(
+    checkpoint_path: str | Path,
+    model_class: type[PreTrainedModel],
+    tokenizer_class: type[PreTrainedTokenizerBase],
+    config: Config,
+    device_map: str = "auto",
+) -> tuple[PreTrainedModel | PeftModel, PreTrainedTokenizerBase]:
     """Load model and tokenizer from checkpoint."""
     from .model import setup_model
 
@@ -158,7 +171,7 @@ def load_checkpoint(checkpoint_path: str, model_class, tokenizer_class, config: 
     return model, tokenizer
 
 
-def setup_wandb_logging(config: Any) -> None:
+def setup_wandb_logging(config: Config) -> None:
     """Setup Weights & Biases logging."""
     if config.logging.use_wandb and config.logging.wandb_mode != "disabled":
         wandb_config = {

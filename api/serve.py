@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """FastAPI server for Mistral NER model."""
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import torch
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedModel, PreTrainedTokenizerBase
+    from src.config import Config
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -45,15 +52,15 @@ class HealthResponse(BaseModel):
 
 # Global variables
 app = FastAPI(title="Mistral NER API", version="1.0.0")
-model = None
-tokenizer = None
-config = None
-device = "cuda" if torch.cuda.is_available() else "cpu"
-logger = None
+model: PreTrainedModel | None = None
+tokenizer: PreTrainedTokenizerBase | None = None
+config: Config | None = None
+device: str = "cuda" if torch.cuda.is_available() else "cpu"
+logger: Any = None
 
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     """Load model on startup."""
     global model, tokenizer, config, logger
 
@@ -131,7 +138,7 @@ async def predict(request: NERRequest):
 
 
 @app.post("/predict_simple")
-async def predict_simple(texts: list[str]):
+async def predict_simple(texts: list[str]) -> list[dict[str, Any]]:
     """Simple prediction endpoint that returns only entities."""
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
@@ -158,7 +165,7 @@ async def predict_simple(texts: list[str]):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-def main():
+def main() -> None:
     """Run the API server."""
     import argparse
 

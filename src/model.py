@@ -1,8 +1,10 @@
 """Model setup and configuration for Mistral NER fine-tuning."""
 
+from __future__ import annotations
+
 import gc
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
@@ -11,8 +13,11 @@ from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
     PreTrainedModel,
-    PreTrainedTokenizer,
+    PreTrainedTokenizerBase,
 )
+
+if TYPE_CHECKING:
+    from .config import Config
 
 logger = logging.getLogger("mistral_ner")
 
@@ -39,7 +44,7 @@ def create_bnb_config(load_in_8bit: bool = True) -> BitsAndBytesConfig:
     return bnb_config
 
 
-def create_lora_config(config: Any) -> LoraConfig:
+def create_lora_config(config: Config) -> LoraConfig:
     """Create LoRA configuration."""
     lora_config = LoraConfig(
         r=config.model.lora_r,
@@ -59,7 +64,7 @@ def create_lora_config(config: Any) -> LoraConfig:
     return lora_config
 
 
-def load_tokenizer(model_name: str) -> PreTrainedTokenizer:
+def load_tokenizer(model_name: str) -> PreTrainedTokenizerBase:
     """Load and configure tokenizer."""
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, add_prefix_space=True)
@@ -81,7 +86,7 @@ def load_tokenizer(model_name: str) -> PreTrainedTokenizer:
         raise
 
 
-def load_base_model(model_name: str, config: Any, bnb_config: BitsAndBytesConfig | None = None) -> PreTrainedModel:
+def load_base_model(model_name: str, config: Config, bnb_config: BitsAndBytesConfig | None = None) -> PreTrainedModel:
     """Load the base model with optional quantization."""
     try:
         logger.info(f"Loading base model: {model_name}")
@@ -187,8 +192,8 @@ def setup_peft_model(model: PreTrainedModel, lora_config: LoraConfig) -> PeftMod
 
 
 def setup_model(
-    model_name: str, config: Any, device_map: str | None = None
-) -> tuple[PreTrainedModel, PreTrainedTokenizer]:
+    model_name: str, config: Config, device_map: str | None = None
+) -> tuple[PeftModel, PreTrainedTokenizerBase]:
     """
     Complete model setup including tokenizer, base model, and LoRA.
 
@@ -221,7 +226,7 @@ def setup_model(
 
 
 def save_model_checkpoint(
-    model: PreTrainedModel, tokenizer: PreTrainedTokenizer, output_dir: str, is_final: bool = False
+    model: PreTrainedModel | PeftModel, tokenizer: PreTrainedTokenizerBase, output_dir: str, is_final: bool = False
 ) -> None:
     """Save model checkpoint."""
     try:
@@ -241,8 +246,8 @@ def save_model_checkpoint(
 
 
 def load_model_from_checkpoint(
-    checkpoint_path: str, config: Any, base_model_name: str | None = None
-) -> tuple[PreTrainedModel, PreTrainedTokenizer]:
+    checkpoint_path: str, config: Config, base_model_name: str | None = None
+) -> tuple[PeftModel, PreTrainedTokenizerBase]:
     """Load model from a checkpoint."""
     try:
         logger.info(f"Loading model from checkpoint: {checkpoint_path}")
@@ -272,7 +277,7 @@ def load_model_from_checkpoint(
         raise
 
 
-def merge_and_save_model(model: PeftModel, tokenizer: PreTrainedTokenizer, output_dir: str) -> None:
+def merge_and_save_model(model: PeftModel, tokenizer: PreTrainedTokenizerBase, output_dir: str) -> None:
     """Merge LoRA weights with base model and save."""
     try:
         logger.info("Merging LoRA weights with base model...")

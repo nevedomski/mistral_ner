@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Main training script for Mistral NER fine-tuning."""
 
+from __future__ import annotations
+
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
+
+if TYPE_CHECKING:
+    from argparse import Namespace
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -18,7 +24,7 @@ from src.training import run_training_pipeline
 from src.utils import check_gpu_memory, print_trainable_parameters, setup_logging
 
 
-def parse_args():
+def parse_args() -> Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Fine-tune Mistral-7B for Named Entity Recognition")
 
@@ -59,7 +65,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     """Main training function."""
     # Parse arguments
     args = parse_args()

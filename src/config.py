@@ -1,7 +1,10 @@
 """Configuration management for Mistral NER fine-tuning."""
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -46,7 +49,7 @@ class DataConfig:
     id2label: dict[int, str] = field(init=False)
     label2id: dict[str, int] = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.id2label = {i: label for i, label in enumerate(self.label_names)}
         self.label2id = {label: i for i, label in enumerate(self.label_names)}
 
@@ -135,7 +138,7 @@ class Config:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     @classmethod
-    def from_yaml(cls, yaml_path: str) -> "Config":
+    def from_yaml(cls, yaml_path: str | Path) -> Config:
         """Load configuration from YAML file."""
         with open(yaml_path) as f:
             config_dict = yaml.safe_load(f)
@@ -154,9 +157,9 @@ class Config:
 
         return config
 
-    def to_yaml(self, yaml_path: str) -> None:
+    def to_yaml(self, yaml_path: str | Path) -> None:
         """Save configuration to YAML file."""
-        config_dict = {
+        config_dict: dict[str, dict[str, Any]] = {
             "model": self.model.__dict__,
             "data": self.data.__dict__,
             "training": self.training.__dict__,

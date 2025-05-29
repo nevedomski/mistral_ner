@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """Inference script for Mistral NER model."""
 
+from __future__ import annotations
+
 import argparse
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
+
+if TYPE_CHECKING:
+    from argparse import Namespace
+    from transformers import PreTrainedModel, PreTrainedTokenizerBase
+    from src.config import Config
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -18,7 +25,7 @@ from src.model import load_model_from_checkpoint, setup_model
 from src.utils import setup_logging
 
 
-def parse_args():
+def parse_args() -> Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run inference with fine-tuned Mistral NER model")
 
@@ -41,7 +48,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_model_for_inference(model_path: str, base_model: str, config: Config):
+def load_model_for_inference(
+    model_path: str, base_model: str, config: Config
+) -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
     """Load model for inference."""
     logger = setup_logging()
 
@@ -63,7 +72,12 @@ def load_model_for_inference(model_path: str, base_model: str, config: Config):
 
 
 def predict_entities(
-    model, tokenizer, texts: list[str], label_names: list[str], device: str = "cuda", batch_size: int = 1
+    model: PreTrainedModel,
+    tokenizer: PreTrainedTokenizerBase,
+    texts: list[str],
+    label_names: list[str],
+    device: str = "cuda",
+    batch_size: int = 1,
 ) -> list[dict[str, Any]]:
     """
     Predict entities in texts.
@@ -192,7 +206,7 @@ def format_output(predictions: list[dict[str, Any]], format_type: str = "inline"
     return "\n".join(output_lines)
 
 
-def main():
+def main() -> None:
     """Main inference function."""
     args = parse_args()
 
