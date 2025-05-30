@@ -253,7 +253,7 @@ def list_offline_runs(wandb_dir: str = "./wandb") -> list[dict[str, Any]]:
                 "run_id": run_dir.name,
                 "path": str(run_dir),
                 "created": run_dir.stat().st_ctime,
-                "size_mb": sum(f.stat().st_size for f in run_dir.rglob("*") if f.is_file()) / (1024 * 1024),
+                "size_mb": round(sum(f.stat().st_size for f in run_dir.rglob("*") if f.is_file()) / (1024 * 1024), 2),
             }
             offline_runs.append(run_info)
 

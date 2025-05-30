@@ -225,19 +225,19 @@ class Config:
     def setup_wandb(self) -> None:
         """Setup WandB based on configuration."""
         from .utils import validate_wandb_config
-        
+
         # Validate configuration first
         validate_wandb_config(self.logging)
-        
+
         if self.logging.use_wandb and self.logging.wandb_mode != "disabled":
             # Ensure wandb directory exists
             os.makedirs(self.logging.wandb_dir, exist_ok=True)
-            
+
             # Set core environment variables
             os.environ["WANDB_PROJECT"] = self.logging.wandb_project
             os.environ["WANDB_MODE"] = self.logging.wandb_mode
             os.environ["WANDB_DIR"] = self.logging.wandb_dir
-            
+
             # Set optional configuration
             if self.logging.wandb_entity:
                 os.environ["WANDB_ENTITY"] = self.logging.wandb_entity
@@ -249,10 +249,10 @@ class Config:
                 os.environ["WANDB_RUN_ID"] = self.logging.wandb_run_id
             if self.logging.wandb_api_key:
                 os.environ["WANDB_API_KEY"] = self.logging.wandb_api_key
-                
+
             # Set resume strategy
             os.environ["WANDB_RESUME"] = self.logging.wandb_resume
-            
+
             # Set tags if provided
             if self.logging.wandb_tags:
                 os.environ["WANDB_TAGS"] = ",".join(self.logging.wandb_tags)
