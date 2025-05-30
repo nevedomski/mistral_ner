@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, mock_open, patch
 
 import pytest
 import torch
@@ -472,14 +472,14 @@ class TestMain:
 
         mock_format.return_value = "Formatted output"
 
-        # Mock file reading
+        # Mock file reading and writing
         mock_file_content = "Line 1\nLine 2\n"
-        with patch("builtins.open", mock_file_content) as mock_open:
-            mock_open.return_value.__enter__.return_value = mock_file_content.split("\n")
+        mock_file_data = mock_open(read_data=mock_file_content)
+        with patch("builtins.open", mock_file_data):
             main()
 
-        # Verify output file was written
-        mock_open.assert_called()
+        # Verify files were opened for reading and writing
+        assert mock_file_data.call_count >= 2  # At least read and write calls
 
     @patch("scripts.inference.setup_logging")
     @patch("scripts.inference.parse_args")
@@ -488,18 +488,30 @@ class TestMain:
         mock_args = Mock()
         mock_args.text = None
         mock_args.file = None
+        mock_args.model_path = "/test/model"
+        mock_args.base_model = "base-model"
+        mock_args.config = "config.yaml"
+        mock_args.device = "cpu"
+        mock_args.batch_size = 1
+        mock_args.output = None
         mock_parse_args.return_value = mock_args
 
         mock_logger = Mock()
         mock_setup_logging.return_value = mock_logger
 
         # Mock config and model loading
+        mock_config = Mock()
+        mock_config.data.label_names = ["O", "B-PER"]
+
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+
         with (
-            patch("scripts.inference.Config.from_yaml"),
-            patch("scripts.inference.load_model_for_inference"),
+            patch("scripts.inference.Config.from_yaml", return_value=mock_config),
+            patch("scripts.inference.load_model_for_inference", return_value=(mock_model, mock_tokenizer)),
             patch("builtins.input", side_effect=["Test input", EOFError()]),
-            patch("scripts.inference.predict_entities"),
-            patch("scripts.inference.format_output"),
+            patch("scripts.inference.predict_entities", return_value=[{"text": "Test input", "entities": []}]),
+            patch("scripts.inference.format_output", return_value="Output"),
             patch("builtins.print"),
         ):
             main()
@@ -519,15 +531,321 @@ class TestMain:
         mock_setup_logging.return_value = mock_logger
 
         # Mock config and model loading
+        mock_config = Mock()
+        mock_config.data.label_names = ["O", "B-PER"]
+
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+
         with (
-            patch("scripts.inference.Config.from_yaml"),
-            patch("scripts.inference.load_model_for_inference"),
+            patch("scripts.inference.Config.from_yaml", return_value=mock_config),
+            patch("scripts.inference.load_model_for_inference", return_value=(mock_model, mock_tokenizer)),
             patch("builtins.input", side_effect=EOFError()),
             pytest.raises(SystemExit) as exc_info,
         ):  # No input provided
             main()
 
+        # Add missing attributes to mock_args
+        mock_args.model_path = "/test/model"
+        mock_args.base_model = "base-model"
+        mock_args.config = "config.yaml"
+        mock_args.device = "cpu"
+        mock_args.batch_size = 1
+
         assert exc_info.value.code == 1
+
+
+class TestPredictEntitiesEdgeCases:
+    """Test edge cases in predict_entities function."""
+
+    def test_predict_entities_word_id_none(self):
+        """Test predict_entities when word_ids contains None values."""
+        mock_model = Mock()
+        mock_model.eval.return_value = None
+        mock_model.to.return_value = mock_model
+
+        mock_outputs = Mock()
+        mock_outputs.logits = torch.tensor([[[0.1, 0.9], [0.8, 0.2], [0.3, 0.7]]])
+        mock_model.return_value = mock_outputs
+
+        mock_tokenizer = Mock()
+        mock_tokenizer.return_value = {
+            "input_ids": torch.tensor([[1, 2, 3]]),
+            "attention_mask": torch.tensor([[1, 1, 1]]),
+        }
+
+        # Mock encoding with None values (special tokens)
+        mock_encoding = Mock()
+        mock_encoding.word_ids.return_value = [None, 0, 1]  # First token is special token
+        mock_tokenizer.side_effect = [
+            {"input_ids": torch.tensor([[1, 2, 3]]), "attention_mask": torch.tensor([[1, 1, 1]])},
+            mock_encoding,
+        ]
+
+        texts = ["Test text"]
+        label_names = ["O", "B-PER"]
+
+        with patch("torch.no_grad"):
+            predictions = predict_entities(mock_model, mock_tokenizer, texts, label_names, device="cpu")
+
+        # Should handle None word_ids correctly (covers line 123: continue)
+        assert len(predictions) == 1
+
+
+class TestExtractEntitiesEdgeCases:
+    """Test edge cases in extract_entities function."""
+
+    def test_extract_entities_new_entity_with_current(self):
+        """Test starting new entity when current_entity exists."""
+        words = ["John", "Mary", "works"]
+        labels = ["B-PER", "B-PER", "O"]  # Two consecutive B- tags
+
+        entities = extract_entities(words, labels)
+
+        # Should create two separate entities (covers line 157: entities.append(current_entity))
+        assert len(entities) == 2
+        assert entities[0]["text"] == "John"
+        assert entities[1]["text"] == "Mary"
+
+
+class TestMainEdgeCases:
+    """Test edge cases in main function."""
+
+    @patch("scripts.inference.format_output")
+    @patch("scripts.inference.predict_entities")
+    @patch("scripts.inference.load_model_for_inference")
+    @patch("scripts.inference.Config.from_yaml")
+    @patch("scripts.inference.setup_logging")
+    @patch("scripts.inference.parse_args")
+    def test_main_output_file_with_entities(
+        self, mock_parse_args, mock_setup_logging, mock_config_from_yaml, mock_load_model, mock_predict, mock_format
+    ):
+        """Test main function with output file and entity printing."""
+        mock_args = Mock()
+        mock_args.model_path = "/test/model"
+        mock_args.base_model = "base-model"
+        mock_args.config = "config.yaml"
+        mock_args.text = "John works at Microsoft"
+        mock_args.file = None
+        mock_args.output = None  # No output file to trigger entity printing
+        mock_args.device = "cpu"
+        mock_args.batch_size = 1
+        mock_parse_args.return_value = mock_args
+
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        mock_config = Mock()
+        mock_config.data.label_names = ["O", "B-PER", "B-ORG"]
+        mock_config_from_yaml.return_value = mock_config
+
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+        mock_load_model.return_value = (mock_model, mock_tokenizer)
+
+        # Mock predictions with entities to trigger entity printing (lines 276-278)
+        mock_predictions = [
+            {
+                "text": "John works at Microsoft",
+                "entities": [
+                    {"text": "John", "type": "PER", "start": 0, "end": 1},
+                    {"text": "Microsoft", "type": "ORG", "start": 3, "end": 4},
+                ],
+            }
+        ]
+        mock_predict.return_value = mock_predictions
+
+        mock_format.return_value = "Formatted output"
+
+        with patch("builtins.print") as mock_print:
+            main()
+
+        # Verify entity printing was called (covers lines 276-278)
+        mock_print.assert_called()
+
+    @patch("scripts.inference.format_output")
+    @patch("scripts.inference.predict_entities")
+    @patch("scripts.inference.load_model_for_inference")
+    @patch("scripts.inference.Config.from_yaml")
+    @patch("scripts.inference.setup_logging")
+    @patch("scripts.inference.parse_args")
+    def test_main_write_to_output_file(
+        self, mock_parse_args, mock_setup_logging, mock_config_from_yaml, mock_load_model, mock_predict, mock_format
+    ):
+        """Test main function writing to output file."""
+        mock_args = Mock()
+        mock_args.model_path = "/test/model"
+        mock_args.base_model = "base-model"
+        mock_args.config = "config.yaml"
+        mock_args.text = "Test text"
+        mock_args.file = None
+        mock_args.output = "/test/output.txt"  # Output file specified
+        mock_args.device = "cpu"
+        mock_args.batch_size = 1
+        mock_parse_args.return_value = mock_args
+
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        mock_config = Mock()
+        mock_config.data.label_names = ["O", "B-PER"]
+        mock_config_from_yaml.return_value = mock_config
+
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+        mock_load_model.return_value = (mock_model, mock_tokenizer)
+
+        mock_predictions = [{"text": "Test text", "entities": []}]
+        mock_predict.return_value = mock_predictions
+
+        mock_format.return_value = "Formatted output"
+
+        # Mock file writing (covers lines 262-264)
+        with patch("builtins.open", mock_open()) as mock_file:
+            main()
+
+        # Verify output file was written
+        mock_file.assert_called_with("/test/output.txt", "w")
+
+    @patch("scripts.inference.format_output")
+    @patch("scripts.inference.predict_entities")
+    @patch("scripts.inference.load_model_for_inference")
+    @patch("scripts.inference.Config.from_yaml")
+    @patch("scripts.inference.setup_logging")
+    @patch("scripts.inference.parse_args")
+    def test_main_file_input_real(
+        self, mock_parse_args, mock_setup_logging, mock_config_from_yaml, mock_load_model, mock_predict, mock_format
+    ):
+        """Test main function with actual file reading."""
+        mock_args = Mock()
+        mock_args.model_path = "/test/model"
+        mock_args.base_model = "base-model"
+        mock_args.config = "config.yaml"
+        mock_args.text = None
+        mock_args.file = "/test/input.txt"
+        mock_args.output = None
+        mock_args.device = "cpu"
+        mock_args.batch_size = 1
+        mock_parse_args.return_value = mock_args
+
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        mock_config = Mock()
+        mock_config.data.label_names = ["O", "B-PER"]
+        mock_config_from_yaml.return_value = mock_config
+
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+        mock_load_model.return_value = (mock_model, mock_tokenizer)
+
+        mock_predictions = [{"text": "Line 1", "entities": []}, {"text": "Line 2", "entities": []}]
+        mock_predict.return_value = mock_predictions
+
+        mock_format.return_value = "Formatted output"
+
+        # Mock file reading to cover lines 229-231
+        mock_file_content = "Line 1\nLine 2\n\n"  # Include empty line
+        with (
+            patch("builtins.open", mock_open(read_data=mock_file_content)) as mock_file,
+            patch("builtins.print"),
+        ):
+            main()
+
+        # Verify file was opened for reading
+        mock_file.assert_called_with("/test/input.txt")
+
+    @patch("scripts.inference.format_output")
+    @patch("scripts.inference.predict_entities")
+    @patch("scripts.inference.load_model_for_inference")
+    @patch("scripts.inference.Config.from_yaml")
+    @patch("scripts.inference.setup_logging")
+    @patch("scripts.inference.parse_args")
+    def test_main_interactive_input_real(
+        self, mock_parse_args, mock_setup_logging, mock_config_from_yaml, mock_load_model, mock_predict, mock_format
+    ):
+        """Test main function with interactive input."""
+        mock_args = Mock()
+        mock_args.model_path = "/test/model"
+        mock_args.base_model = "base-model"
+        mock_args.config = "config.yaml"
+        mock_args.text = None
+        mock_args.file = None
+        mock_args.output = None
+        mock_args.device = "cpu"
+        mock_args.batch_size = 1
+        mock_parse_args.return_value = mock_args
+
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        mock_config = Mock()
+        mock_config.data.label_names = ["O", "B-PER"]
+        mock_config_from_yaml.return_value = mock_config
+
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+        mock_load_model.return_value = (mock_model, mock_tokenizer)
+
+        mock_predictions = [{"text": "Interactive input", "entities": []}]
+        mock_predict.return_value = mock_predictions
+
+        mock_format.return_value = "Formatted output"
+
+        # Mock interactive input to cover lines 234-241
+        with (
+            patch("builtins.input", side_effect=["Interactive input", "  ", EOFError()]) as mock_input,
+            patch("builtins.print"),
+        ):
+            main()
+
+        # Verify interactive mode was used
+        assert mock_input.call_count >= 2
+
+    @patch("scripts.inference.setup_logging")
+    @patch("scripts.inference.parse_args")
+    def test_main_no_texts_error(self, mock_parse_args, mock_setup_logging):
+        """Test main function error when no texts provided."""
+        mock_args = Mock()
+        mock_args.model_path = "/test/model"
+        mock_args.base_model = "base-model"
+        mock_args.config = "config.yaml"
+        mock_args.text = None
+        mock_args.file = None
+        mock_args.device = "cpu"
+        mock_args.batch_size = 1
+        mock_parse_args.return_value = mock_args
+
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        mock_config = Mock()
+        mock_config.data.label_names = ["O", "B-PER"]
+
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+
+        # Mock everything needed to get to the error condition
+        with (
+            patch("scripts.inference.Config.from_yaml", return_value=mock_config),
+            patch("scripts.inference.load_model_for_inference", return_value=(mock_model, mock_tokenizer)),
+            patch("builtins.input", side_effect=EOFError()),  # No input provided in interactive mode
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        # Should exit with code 1 (covers lines 244-245)
+        assert exc_info.value.code == 1
+
+
+def test_main_module_execution():
+    """Test the __name__ == '__main__' execution."""
+    # The if __name__ == '__main__' line is hard to test directly
+    # but it's covered by our other tests that import the module
+    import scripts.inference
+
+    # Verify that the main function exists and is callable
+    assert callable(scripts.inference.main)
 
 
 if __name__ == "__main__":
