@@ -101,7 +101,7 @@ def tokenize_and_align_labels(
         labels.append(label_ids)
 
     tokenized_inputs["labels"] = labels
-    return tokenized_inputs
+    return tokenized_inputs  # type: ignore[return-value]
 
 
 def create_data_collator(tokenizer: PreTrainedTokenizerBase) -> DataCollatorForTokenClassification:
@@ -189,7 +189,7 @@ def get_label_list(dataset: DatasetDict) -> list[str]:
     """Extract label list from dataset."""
     features = dataset["train"].features["ner_tags"]
     if hasattr(features, "feature") and hasattr(features.feature, "names"):
-        return features.feature.names
+        return features.feature.names  # type: ignore[return-value]
     else:
         # Fallback to default CoNLL-2003 labels
         return ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
@@ -218,7 +218,7 @@ def print_dataset_statistics(dataset: DatasetDict, tokenizer: PreTrainedTokenize
 
         if "ner_tags" in split_data.features:
             # Count entities
-            entity_counts = {}
+            entity_counts: dict[str, int] = {}
             for ex in split_data:
                 for tag in ex["ner_tags"]:
                     entity_counts[tag] = entity_counts.get(tag, 0) + 1

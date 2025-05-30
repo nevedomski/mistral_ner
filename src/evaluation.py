@@ -32,7 +32,7 @@ def load_seqeval_metric() -> EvaluationModule | None:
 
 
 def align_predictions(
-    predictions: np.ndarray, label_ids: np.ndarray, label_names: list[str]
+    predictions: np.ndarray[Any, Any], label_ids: np.ndarray[Any, Any], label_names: list[str]
 ) -> tuple[list[list[str]], list[list[str]]]:
     """
     Align predictions with labels, removing padding and special tokens.
@@ -168,9 +168,9 @@ def evaluate_model(
     device = next(model.parameters()).device
 
     with torch.no_grad():
-        for batch in eval_dataloader:
+        for batch_raw in eval_dataloader:
             # Move batch to device
-            batch: dict[str, Any] = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            batch: dict[str, Any] = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch_raw.items()}
 
             # Forward pass
             outputs = model(**batch)
@@ -236,7 +236,7 @@ def save_predictions(
 
 def compute_confusion_matrix(
     predictions: list[list[str]], labels: list[list[str]], label_names: list[str]
-) -> np.ndarray:
+) -> np.ndarray[Any, Any]:
     """Compute confusion matrix for NER predictions."""
     from sklearn.metrics import confusion_matrix
 
@@ -247,10 +247,10 @@ def compute_confusion_matrix(
     # Compute confusion matrix
     cm = confusion_matrix(flat_labels, flat_predictions, labels=label_names)
 
-    return cm
+    return cm  # type: ignore[return-value]
 
 
-def log_confusion_matrix_to_wandb(confusion_matrix: np.ndarray, label_names: list[str]) -> None:
+def log_confusion_matrix_to_wandb(confusion_matrix: np.ndarray[Any, Any], label_names: list[str]) -> None:
     """Log confusion matrix to Weights & Biases."""
     if wandb.run is not None:
         wandb.log(

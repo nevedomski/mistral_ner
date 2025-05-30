@@ -40,6 +40,18 @@ jobs:
         run: |
           uv run mypy src/ tests/ scripts/ api/
 
+      - name: Cache MyPy
+        uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key: mypy-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('src/**/*.py') }}
+          restore-keys: |
+            mypy-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-
+            mypy-${{ runner.os }}-
+
+      - name: Run MyPy type checking
+        run: mypy
+
   test:
     runs-on: ubuntu-latest
     strategy:
