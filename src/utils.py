@@ -21,26 +21,25 @@ if TYPE_CHECKING:
 def validate_wandb_config(logging_config: LoggingConfig) -> None:
     """Validate WandB configuration and auto-adjust if needed."""
     import warnings
-    
+
     # Validate mode
     valid_modes = {"online", "offline", "disabled"}
     if logging_config.wandb_mode not in valid_modes:
         raise ValueError(f"wandb_mode must be one of {valid_modes}, got {logging_config.wandb_mode}")
-    
+
     # Validate resume strategy
     valid_resume = {"allow", "must", "never", "auto"}
     if logging_config.wandb_resume not in valid_resume:
         raise ValueError(f"wandb_resume must be one of {valid_resume}, got {logging_config.wandb_resume}")
-    
+
     # Auto-fallback to offline if no API key and online mode
     if logging_config.wandb_mode == "online":
         api_key = logging_config.wandb_api_key or os.getenv("WANDB_API_KEY")
         if not api_key:
             warnings.warn(
-                "WANDB_API_KEY not found and no api key provided. "
-                "Switching to offline mode for this session.",
+                "WANDB_API_KEY not found and no api key provided. Switching to offline mode for this session.",
                 UserWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             logging_config.wandb_mode = "offline"
 
@@ -204,7 +203,7 @@ def setup_wandb_logging(config: Config) -> None:
     if config.logging.use_wandb and config.logging.wandb_mode != "disabled":
         # Validate configuration first
         validate_wandb_config(config.logging)
-        
+
         wandb_config = {
             "model_name": config.model.model_name,
             "num_train_epochs": config.training.num_train_epochs,
@@ -227,26 +226,26 @@ def setup_wandb_logging(config: Config) -> None:
             "tags": config.logging.wandb_tags,
             "notes": config.logging.wandb_notes,
             "config": wandb_config,
-            "mode": config.logging.wandb_mode,  # type: ignore[arg-type]
+            "mode": config.logging.wandb_mode,
             "dir": config.logging.wandb_dir,
             "resume": config.logging.wandb_resume,
         }
-        
+
         # Add run_id if specified for resuming
         if config.logging.wandb_run_id:
             init_params["id"] = config.logging.wandb_run_id
-            
-        wandb.init(**init_params)
+
+        wandb.init(**init_params)  # type: ignore[arg-type]
 
 
 def list_offline_runs(wandb_dir: str = "./wandb") -> list[dict[str, Any]]:
     """List all offline WandB runs in the specified directory."""
     wandb_path = Path(wandb_dir)
-    offline_runs = []
-    
+    offline_runs: list[dict[str, Any]] = []
+
     if not wandb_path.exists():
         return offline_runs
-    
+
     # Look for offline run directories
     for run_dir in wandb_path.iterdir():
         if run_dir.is_dir() and run_dir.name.startswith("offline-run-"):
@@ -254,10 +253,10 @@ def list_offline_runs(wandb_dir: str = "./wandb") -> list[dict[str, Any]]:
                 "run_id": run_dir.name,
                 "path": str(run_dir),
                 "created": run_dir.stat().st_ctime,
-                "size_mb": sum(f.stat().st_size for f in run_dir.rglob("*") if f.is_file()) / (1024 * 1024)
+                "size_mb": round(sum(f.stat().st_size for f in run_dir.rglob("*") if f.is_file()) / (1024 * 1024), 2),
             }
             offline_runs.append(run_info)
-    
+
     return sorted(offline_runs, key=lambda x: x["created"], reverse=True)
 
 
@@ -266,12 +265,8 @@ def sync_offline_run(run_path: str) -> bool:
     try:
         # Use wandb sync command
         import subprocess
-        _ = subprocess.run(
-            ["wandb", "sync", run_path],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+
+        _ = subprocess.run(["wandb", "sync", run_path], capture_output=True, text=True, check=True)
         return True
     except subprocess.CalledProcessError as e:
         logging.getLogger("mistral_ner").error(f"Failed to sync run {run_path}: {e}")
@@ -281,14 +276,14 @@ def sync_offline_run(run_path: str) -> bool:
 def sync_all_offline_runs(wandb_dir: str = "./wandb") -> dict[str, Any]:
     """Sync all offline runs to WandB servers."""
     offline_runs = list_offline_runs(wandb_dir)
-    results = {"synced": [], "failed": []}
-    
+    results: dict[str, Any] = {"synced": [], "failed": []}
+
     for run in offline_runs:
         if sync_offline_run(run["path"]):
             results["synced"].append(run["run_id"])
         else:
             results["failed"].append(run["run_id"])
-    
+
     return results
 
 
