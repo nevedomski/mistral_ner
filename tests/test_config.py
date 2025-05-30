@@ -52,7 +52,7 @@ data:
 
 training:
   num_train_epochs: 3
-  learning_rate: 1e-4
+  learning_rate: 0.0001
 
 logging:
   use_wandb: false
@@ -69,7 +69,7 @@ logging:
         assert config.model.lora_r == 8
         assert config.data.max_length == 128
         assert config.training.num_train_epochs == 3
-        assert config.training.learning_rate == 1e-4
+        assert config.training.learning_rate == 0.0001
         assert not config.logging.use_wandb
 
         Path(f.name).unlink()
