@@ -152,5 +152,110 @@ def test_setup_wandb():
     assert "wandb" not in config.training.report_to
 
 
+def test_setup_wandb_optional_fields():
+    """Test WandB setup with optional fields to cover missing lines."""
+    import os
+
+    config = Config()
+    config.logging.use_wandb = True
+    config.logging.wandb_project = "test-project"
+    config.logging.wandb_mode = "online"
+
+    # Set optional fields to trigger missing lines 243, 245, 247, 249, 251
+    config.logging.wandb_entity = "test-entity"
+    config.logging.wandb_name = "test-run"
+    config.logging.wandb_notes = "test notes"
+    config.logging.wandb_run_id = "test-run-id"
+    config.logging.wandb_api_key = "test-api-key"
+
+    # Set tags to trigger missing line 258
+    config.logging.wandb_tags = ["tag1", "tag2"]
+
+    config.setup_wandb()
+
+    # Verify environment variables are set for optional fields
+    assert os.environ.get("WANDB_ENTITY") == "test-entity"
+    assert os.environ.get("WANDB_NAME") == "test-run"
+    assert os.environ.get("WANDB_NOTES") == "test notes"
+    assert os.environ.get("WANDB_RUN_ID") == "test-run-id"
+    assert os.environ.get("WANDB_API_KEY") == "test-api-key"
+    assert os.environ.get("WANDB_TAGS") == "tag1,tag2"
+
+
+def test_update_from_args_comprehensive():
+    """Test comprehensive args update to cover missing lines."""
+    config = Config()
+
+    # Mock args object with all possible attributes to cover missing lines
+    class ComprehensiveArgs:
+        # Model config (line 185)
+        load_in_8bit = False
+        model_name = "new-model"
+
+        # Data config
+        max_length = 512
+
+        # Training config (lines 193, 195, 197)
+        output_dir = "./new-output"
+        num_train_epochs = 10
+        per_device_train_batch_size = 8
+        learning_rate = 3e-4
+        resume_from_checkpoint = "checkpoint-200"
+
+        # Logging config - all wandb options (lines 207, 209, 211, 213, 215, 217, 219, 221, 223)
+        use_wandb = True
+        wandb_project = "new-project"
+        wandb_entity = "new-entity"
+        wandb_name = "new-run"
+        wandb_mode = "disabled"
+        wandb_dir = "./new-wandb"
+        wandb_resume = "never"
+        wandb_run_id = "new-run-id"
+        wandb_tags = ["new-tag1", "new-tag2"]  # noqa: RUF012
+        wandb_notes = "new notes"
+
+    args = ComprehensiveArgs()
+    config.update_from_args(args)
+
+    # Verify all updates
+    assert config.model.load_in_8bit is False
+    assert config.model.model_name == "new-model"
+    assert config.data.max_length == 512
+    assert config.training.output_dir == "./new-output"
+    assert config.training.num_train_epochs == 10
+    assert config.training.per_device_train_batch_size == 8
+    assert config.training.learning_rate == 3e-4
+    assert config.training.resume_from_checkpoint == "checkpoint-200"
+    assert config.logging.use_wandb is True
+    assert config.logging.wandb_project == "new-project"
+    assert config.logging.wandb_entity == "new-entity"
+    assert config.logging.wandb_name == "new-run"
+    assert config.logging.wandb_mode == "disabled"
+    assert config.logging.wandb_dir == "./new-wandb"
+    assert config.logging.wandb_resume == "never"
+    assert config.logging.wandb_run_id == "new-run-id"
+    assert config.logging.wandb_tags == ["new-tag1", "new-tag2"]
+    assert config.logging.wandb_notes == "new notes"
+
+
+def test_update_from_args_missing_attributes():
+    """Test update_from_args with object missing some attributes."""
+    config = Config()
+
+    # Mock args object with only some attributes
+    class PartialArgs:
+        model_name = "partial-model"
+        # Missing other attributes to test hasattr checks
+
+    args = PartialArgs()
+    config.update_from_args(args)
+
+    # Only model_name should be updated
+    assert config.model.model_name == "partial-model"
+    # Other values should remain defaults
+    assert config.model.load_in_8bit is True  # default
+    assert config.training.output_dir == "./mistral-ner-finetuned"  # default
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
