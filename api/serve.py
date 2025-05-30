@@ -110,6 +110,9 @@ async def predict(request: NERRequest):
 
     try:
         # Run prediction
+        if config is None:
+            raise HTTPException(status_code=503, detail="Config not loaded")
+
         predictions = predict_entities(
             model=model,
             tokenizer=tokenizer,
@@ -145,6 +148,9 @@ async def predict_simple(texts: list[str]) -> list[dict[str, Any]]:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     try:
+        if config is None:
+            raise HTTPException(status_code=503, detail="Config not loaded")
+
         predictions = predict_entities(
             model=model,
             tokenizer=tokenizer,

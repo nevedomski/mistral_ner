@@ -161,7 +161,7 @@ def extract_entities(words: list[str], labels: list[str]) -> list[dict[str, Any]
 
         elif label.startswith("I-") and current_entity:
             # Continue entity
-            current_entity["text"] += " " + word
+            current_entity["text"] = str(current_entity["text"]) + " " + word
             current_entity["end"] = i + 1
 
         else:
