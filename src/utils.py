@@ -276,7 +276,7 @@ def sync_offline_run(run_path: str) -> bool:
 def sync_all_offline_runs(wandb_dir: str = "./wandb") -> dict[str, Any]:
     """Sync all offline runs to WandB servers."""
     offline_runs = list_offline_runs(wandb_dir)
-    results: dict[str, Any] = {"synced": [], "failed": []}
+    results: dict[str, list[str]] = {"synced": [], "failed": []}
 
     for run in offline_runs:
         if sync_offline_run(run["path"]):
