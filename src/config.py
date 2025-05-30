@@ -163,9 +163,12 @@ class Config:
 
     def to_yaml(self, yaml_path: str | Path) -> None:
         """Save configuration to YAML file."""
+        # Create clean dictionaries without computed fields
+        data_dict = {k: v for k, v in self.data.__dict__.items() if k not in ["id2label", "label2id"]}
+
         config_dict: dict[str, dict[str, Any]] = {
             "model": self.model.__dict__,
-            "data": self.data.__dict__,
+            "data": data_dict,
             "training": self.training.__dict__,
             "logging": self.logging.__dict__,
         }

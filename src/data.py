@@ -162,6 +162,9 @@ def create_sample_dataset(size: int = 100, config: Config | None = None) -> Data
     else:
         label_names = config.data.label_names  # noqa: F841
 
+    # Use label_names for validation but not required for the sample generation
+    _ = label_names
+
     def generate_sample(idx: int) -> dict[str, Any]:
         tokens = ["This", "is", "a", "test", "sentence", "with", "John", "Smith", "in", "New", "York", "."]
         ner_tags = [0, 0, 0, 0, 0, 0, 1, 2, 0, 5, 6, 0]  # Example tags
