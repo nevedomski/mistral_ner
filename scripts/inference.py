@@ -147,8 +147,8 @@ def predict_entities(
 
 def extract_entities(words: list[str], labels: list[str]) -> list[dict[str, Any]]:
     """Extract entities from BIO labels."""
-    entities = []
-    current_entity = None
+    entities: list[dict[str, Any]] = []
+    current_entity: dict[str, Any] | None = None
 
     for i, (word, label) in enumerate(zip(words, labels, strict=False)):
         if label.startswith("B-"):
