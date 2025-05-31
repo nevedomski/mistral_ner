@@ -96,6 +96,7 @@ validation_reports/
 
 # Additional coverage reports (from validation script)
 coverage.json
+coverage.xml
 test-results.xml
 
 # git

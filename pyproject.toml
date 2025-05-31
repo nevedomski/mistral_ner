@@ -54,6 +54,7 @@ cpu = [
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
     "ruff>=0.4.7",
     "mypy>=1.9.0",
     "types-PyYAML",
@@ -61,6 +62,11 @@ dev = [
     "types-tqdm",
     "types-protobuf",
     "pandas-stubs",
+    "rich>=13.0.0",
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0", 
+    "torchvision>=0.22.0",
+    "httpx>=0.24.0",
 ]
 cuda11 = [
     "torch>=2.7.0",
@@ -231,6 +237,7 @@ addopts = [
     "--cov-report=html",
     "--cov-fail-under=90",
 ]
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
@@ -240,6 +247,8 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
+    "regression: marks tests as regression tests",
+    "asyncio: marks tests as async tests",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

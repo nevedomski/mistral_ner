@@ -182,8 +182,8 @@ class RuffRunner(BaseRunner):
                             details["rules_violated"].append(rule)
 
         # Count format issues
-        if "would reformat" in format_output:
-            details["format_issues"] = len(re.findall(r"would reformat", format_output))
+        if "would reformat" in format_output.lower():
+            details["format_issues"] = len(re.findall(r"would reformat", format_output, re.IGNORECASE))
 
         return details
 
@@ -263,7 +263,7 @@ class MypyRunner(BaseRunner):
         return details
 
 
-class TestRunner(BaseRunner):
+class PytestRunner(BaseRunner):
     """Runner for pytest with coverage."""
 
     def run(self, target_args: list[str] | None = None, fix: bool = False) -> CheckResult:
@@ -274,11 +274,16 @@ class TestRunner(BaseRunner):
             sys.executable,
             "-m",
             "pytest",
-            "--cov=src",
+            # Note: --cov=src already in pyproject.toml, only add additional coverage
             "--cov=api",
             "--cov=scripts",
-            "--cov-report=term-missing",
+            # Note: --cov-report=term-missing already in pyproject.toml
             "--cov-report=json:coverage.json",
+            "--cov-report=xml:coverage.xml",
+            # Override the html report path from pyproject.toml
+            "--cov-report=html:htmlcov",
+            # Ensure we don't fail due to coverage threshold edge cases
+            "--cov-fail-under=90",
             "-v",
         ]
 
@@ -329,7 +334,14 @@ class TestRunner(BaseRunner):
 
     def _parse_pytest_output(self, output: str) -> dict[str, Any]:
         """Parse pytest output for detailed information."""
-        details: dict[str, Any] = {"tests_run": 0, "passed": 0, "failed": 0, "skipped": 0, "coverage_total": 0.0, "coverage_files": {}}
+        details: dict[str, Any] = {
+            "tests_run": 0,
+            "passed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "coverage_total": 0.0,
+            "coverage_files": {},
+        }
 
         if output:
             # Parse test results
@@ -368,7 +380,7 @@ class ValidationScript:
         self.runners = {
             "ruff": RuffRunner(self.console),
             "mypy": MypyRunner(self.console),
-            "tests": TestRunner(self.console),
+            "tests": PytestRunner(self.console),
         }
 
     def run_validation(

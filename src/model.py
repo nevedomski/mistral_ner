@@ -148,7 +148,7 @@ def prepare_model_for_kbit_training(model: PreTrainedModel) -> PreTrainedModel:
         model.enable_input_require_grads()
     else:
 
-        def make_inputs_require_grad(module: Any, inputs: Any, output: Any) -> None:
+        def make_inputs_require_grad(module: torch.nn.Module, inputs: torch.Tensor, output: torch.Tensor) -> None:
             if hasattr(inputs, "requires_grad_"):
                 inputs.requires_grad_(True)
             elif isinstance(inputs, list | tuple):

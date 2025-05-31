@@ -170,7 +170,9 @@ def evaluate_model(
     with torch.no_grad():
         for batch_raw in eval_dataloader:
             # Move batch to device
-            batch: dict[str, Any] = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch_raw.items()}
+            batch: dict[str, Any] = {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch_raw.items()
+            }
 
             # Forward pass
             outputs = model(**batch)
@@ -247,7 +249,7 @@ def compute_confusion_matrix(
     # Compute confusion matrix
     cm = confusion_matrix(flat_labels, flat_predictions, labels=label_names)
 
-    return cm  # type: ignore[return-value]
+    return cm  # type: ignore[no-any-return]
 
 
 def log_confusion_matrix_to_wandb(confusion_matrix: np.ndarray[Any, Any], label_names: list[str]) -> None:

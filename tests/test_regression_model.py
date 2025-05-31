@@ -366,7 +366,9 @@ class TestModelOutputRegression:
 
             # Create mock prediction based on expected entities
             mock_entities = []
-            for entity_text, entity_type in zip(test_case["expected_entities"], test_case["expected_labels"], strict=False):
+            for entity_text, entity_type in zip(
+                test_case["expected_entities"], test_case["expected_labels"], strict=False
+            ):
                 mock_entities.append({"text": entity_text, "type": entity_type})
 
             with patch("scripts.inference.predict_entities") as mock_predict:

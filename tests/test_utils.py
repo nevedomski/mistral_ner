@@ -453,7 +453,7 @@ def test_sync_all_offline_runs():
         assert mock_sync.call_count == 3
 
 
-def test_setup_logging_invalid_level(tmp_path):
+def test_setup_logging_invalid_level_duplicate(tmp_path):
     """Test logging setup with invalid log level."""
     log_dir = tmp_path / "logs"
     with pytest.raises(ValueError, match="Invalid log level"):
@@ -506,7 +506,7 @@ def test_validate_wandb_config_missing_api_key():
         assert mock_config.wandb_mode == "offline"
 
 
-def test_print_trainable_parameters():
+def test_print_trainable_parameters_duplicate():
     """Test print_trainable_parameters function."""
     # Create a mock model with parameters
     mock_model = Mock()
@@ -623,7 +623,7 @@ def test_detect_mixed_precision_support_without_cuda(mock_available):
     assert result["tf32"] is False
 
 
-def test_save_model_and_tokenizer(tmp_path):
+def test_save_model_and_tokenizer_duplicate(tmp_path):
     """Test save_model_and_tokenizer function."""
     mock_model = Mock()
     mock_tokenizer = Mock()
@@ -705,7 +705,7 @@ def test_load_checkpoint_regular_model(mock_logger_get, tmp_path):
 
 
 @patch("src.utils.wandb.init")
-def test_setup_wandb_logging(mock_wandb_init):
+def test_setup_wandb_logging_duplicate(mock_wandb_init):
     """Test setup_wandb_logging function."""
     mock_config = Mock()
     mock_config.logging.use_wandb = True
@@ -820,7 +820,7 @@ def test_sync_offline_run_failure(mock_logger_get, mock_subprocess):
 
 @patch("src.utils.sync_offline_run")
 @patch("src.utils.list_offline_runs")
-def test_sync_all_offline_runs(mock_list_runs, mock_sync_run):
+def test_sync_all_offline_runs_duplicate(mock_list_runs, mock_sync_run):
     """Test sync_all_offline_runs function."""
     mock_runs = [
         {"run_id": "run1", "path": "/path/to/run1"},
