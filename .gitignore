@@ -88,6 +88,16 @@ CLAUDE.local.md
 CLAUDE.md
 .claude
 
+# Validation reports and artifacts
+validation_reports/
+*.validation.json
+*.validation.html
+.validation_cache/
+
+# Additional coverage reports (from validation script)
+coverage.json
+test-results.xml
+
 # git
 mistral_ner_agents/
 
