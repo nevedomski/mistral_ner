@@ -70,7 +70,7 @@ class CustomWandbCallback(WandbCallback):
         if self._wandb is not None and logs is not None:
             # Add GPU memory stats
             memory_stats = check_gpu_memory()
-            if isinstance(memory_stats, dict) and "error" not in memory_stats:
+            if "error" not in memory_stats:
                 for gpu_id, stats in memory_stats.items():
                     if isinstance(stats, dict):
                         logs[f"gpu/{gpu_id}/memory_used_gb"] = stats["allocated_gb"]
@@ -219,7 +219,7 @@ class TrainingManager:
                 trainer.save_model(self.config.training.final_output_dir)
                 trainer.save_state()
 
-            return train_result.metrics  # type: ignore[return-value]
+            return train_result.metrics  # type: ignore[no-any-return]
 
         except torch.cuda.OutOfMemoryError as e:
             logger.error(f"CUDA out of memory during training: {e}")

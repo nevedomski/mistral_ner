@@ -1,0 +1,129 @@
+# Validation Configuration for Mistral NER Project
+# This file provides optional overrides for the validation script
+# The main configurations are still read from pyproject.toml
+
+# Default checks to run (can be overridden by CLI)
+default_checks:
+  - ruff
+  - mypy
+  - tests
+
+# Timeout settings (in seconds)
+timeouts:
+  ruff: 300      # 5 minutes for ruff checks
+  mypy: 300      # 5 minutes for mypy checks
+  tests: 600     # 10 minutes for tests
+
+# Output settings
+output:
+  default_format: console  # console, json, html
+  show_progress: true
+  colors: true
+  
+# Report settings
+reports:
+  # Directory to save reports (relative to project root)
+  output_dir: "validation_reports"
+  
+  # Include detailed output in reports
+  include_stdout: true
+  include_stderr: true
+  
+  # HTML report settings
+  html:
+    theme: "default"  # Options: default, dark
+    include_coverage_details: true
+    
+  # JSON report settings  
+  json:
+    pretty_print: true
+    include_raw_output: false
+
+# File patterns to include/exclude
+patterns:
+  # Additional patterns to include (beyond CLI args)
+  include:
+    - "src/**/*.py"
+    - "api/**/*.py"
+    - "scripts/**/*.py"
+    
+  # Patterns to exclude from validation
+  exclude:
+    - "**/__pycache__/**"
+    - "**/.*"
+    - "build/**"
+    - "dist/**"
+    - "**/*.pyc"
+
+# Tool-specific settings
+tools:
+  ruff:
+    # Additional args to pass to ruff (beyond pyproject.toml config)
+    extra_args: []
+    
+    # Whether to run both check and format
+    run_format_check: true
+    
+  mypy:
+    # Additional args to pass to mypy
+    extra_args: []
+    
+    # Whether to use incremental checking
+    incremental: true
+    
+  pytest:
+    # Additional args to pass to pytest
+    extra_args:
+      - "--tb=short"  # Shorter traceback format
+      
+    # Coverage settings
+    coverage:
+      min_percentage: 90  # Minimum coverage percentage to pass
+      include_packages:
+        - "src"
+        - "api" 
+        - "scripts"
+      exclude_patterns:
+        - "*/tests/*"
+        - "*/__pycache__/*"
+
+# Parallel execution settings
+parallel:
+  # Whether to run compatible checks in parallel
+  enabled: true
+  
+  # Maximum number of parallel processes
+  max_workers: 2
+  
+  # Checks that can run in parallel
+  compatible_groups:
+    - ["ruff", "mypy"]  # These can run together
+    # tests usually run alone due to resource usage
+
+# Environment settings
+environment:
+  # Environment variables to set during validation
+  variables:
+    PYTHONPATH: "."
+    
+  # Whether to activate virtual environment detection
+  detect_venv: true
+
+# Notification settings (for future enhancement)
+notifications:
+  # Whether to show desktop notifications (requires additional deps)
+  desktop: false
+  
+  # Whether to play sound on completion
+  sound: false
+
+# Development settings
+development:
+  # Whether to show debug information
+  debug: false
+  
+  # Whether to save debug logs
+  save_logs: false
+  
+  # Log file location
+  log_file: "validation_debug.log"

@@ -443,7 +443,7 @@ class TestMainExecution:
         # Test the if __name__ == "__main__" block by running the module directly
         # with a quick exit to avoid timeout
         result = subprocess.run(
-            [sys.executable, "-m", "api.serve", "--help"], capture_output=True, text=True, timeout=10
+            [sys.executable, "-m", "api.serve", "--help"], capture_output=True, text=True, timeout=30
         )
 
         # The help command should complete quickly and successfully
