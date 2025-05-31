@@ -1,0 +1,34 @@
+{
+  "test_cases": [
+    {
+      "id": "basic_entities",
+      "input": "John Smith works at Microsoft in Seattle.",
+      "expected_entities": ["John Smith", "Microsoft", "Seattle"],
+      "expected_labels": ["PER", "ORG", "LOC"]
+    },
+    {
+      "id": "complex_entities",
+      "input": "Apple Inc. CEO Tim Cook announced new products.",
+      "expected_entities": ["Apple Inc.", "Tim Cook"],
+      "expected_labels": ["ORG", "PER"]
+    },
+    {
+      "id": "mixed_entities",
+      "input": "The United Nations meeting in New York was attended by President Biden.",
+      "expected_entities": ["United Nations", "New York", "Biden"],
+      "expected_labels": ["ORG", "LOC", "PER"]
+    },
+    {
+      "id": "no_entities",
+      "input": "The weather is nice today.",
+      "expected_entities": [],
+      "expected_labels": []
+    },
+    {
+      "id": "financial_entities",
+      "input": "Tesla stock rose after Elon Musk announced new plans for SpaceX.",
+      "expected_entities": ["Tesla", "Elon Musk", "SpaceX"],
+      "expected_labels": ["ORG", "PER", "ORG"]
+    }
+  ]
+}
