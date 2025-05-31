@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import logging
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import torch
@@ -56,9 +57,7 @@ def create_lora_config(config: Config) -> LoraConfig:
     )
 
     logger.info(
-        f"Created LoRA config: r={config.model.lora_r}, "
-        f"alpha={config.model.lora_alpha}, "
-        f"target_modules={config.model.target_modules}"
+        f"Created LoRA config: r={config.model.lora_r}, alpha={config.model.lora_alpha}, target_modules={config.model.target_modules}"
     )
 
     return lora_config
@@ -148,7 +147,9 @@ def prepare_model_for_kbit_training(model: PreTrainedModel) -> PreTrainedModel:
         model.enable_input_require_grads()
     else:
 
-        def make_inputs_require_grad(module: torch.nn.Module, inputs: torch.Tensor | Sequence[torch.Tensor], output: torch.Tensor) -> None:
+        def make_inputs_require_grad(
+            module: torch.nn.Module, inputs: torch.Tensor | Sequence[torch.Tensor], output: torch.Tensor
+        ) -> None:
             if hasattr(inputs, "requires_grad_"):
                 inputs.requires_grad_(True)
             elif isinstance(inputs, list | tuple):
@@ -179,9 +180,7 @@ def setup_peft_model(model: PreTrainedModel, lora_config: LoraConfig) -> PeftMod
 
         trainable_percent = 100 * trainable_params / all_param
         logger.info(
-            f"Trainable params: {trainable_params:,} || "
-            f"All params: {all_param:,} || "
-            f"Trainable%: {trainable_percent:.4f}"
+            f"Trainable params: {trainable_params:,} || All params: {all_param:,} || Trainable%: {trainable_percent:.4f}"
         )
 
         return model

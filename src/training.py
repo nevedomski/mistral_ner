@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
-import wandb
 from datasets import Dataset
 from transformers import (
     EarlyStoppingCallback,
@@ -22,6 +21,8 @@ from transformers import (
     TrainingArguments,
 )
 from transformers.integrations import WandbCallback
+
+import wandb
 
 from .evaluation import compute_metrics_factory, load_seqeval_metric
 from .utils import check_gpu_memory, clear_gpu_cache, detect_mixed_precision_support
