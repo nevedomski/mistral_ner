@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING, Any
 import evaluate
 import numpy as np
 import torch
-import wandb
 from datasets import Dataset
 from seqeval.metrics import accuracy_score, classification_report, f1_score, precision_score, recall_score
 from transformers import EvalPrediction, PreTrainedModel, PreTrainedTokenizerBase
+
+import wandb
 
 if TYPE_CHECKING:
     from evaluate import EvaluationModule

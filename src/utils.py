@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
-import wandb
 from peft import PeftModel
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
+
+import wandb
 
 if TYPE_CHECKING:
     from .config import Config, LoggingConfig
