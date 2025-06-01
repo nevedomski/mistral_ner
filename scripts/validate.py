@@ -69,6 +69,10 @@ class ValidationReport:
     overall_status: str
     checks: list[CheckResult]
     summary: dict[str, Any]
+    uv_version: str = "unknown"
+    python_executable: str = ""
+    path_env: str = ""
+    virtual_env: str = ""
 
 
 class FileSelector:
@@ -108,15 +112,23 @@ class RuffRunner(BaseRunner):
 
     def run(self, target_args: list[str] | None = None, fix: bool = False) -> CheckResult:
         """Run ruff checks."""
+        import os
+
         start_time = time.time()
         target_args = target_args or ["."]
 
-        # Run ruff check
-        check_cmd = [sys.executable, "-m", "ruff", "check"] + (["--fix"] if fix else []) + target_args
-        format_cmd = [sys.executable, "-m", "ruff", "format"] + ([] if fix else ["--check"]) + target_args
+        # Use UV to run ruff - this ensures proper environment and PATH resolution
+        check_cmd = ["uv", "run", "ruff", "check"] + (["--fix"] if fix else []) + target_args
+        format_cmd = ["uv", "run", "ruff", "format"] + ([] if fix else ["--check"]) + target_args
 
         if self.console and RICH_AVAILABLE:
             self.console.print(f"[blue]Running:[/blue] {' '.join(check_cmd)}")
+            # Additional debug info for CI troubleshooting
+            import os
+
+            if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+                self.console.print(f"[dim]Working directory: {os.getcwd()}[/dim]")
+                self.console.print(f"[dim]Python executable: {sys.executable}[/dim]")
 
         try:
             # Run check
@@ -195,8 +207,8 @@ class MypyRunner(BaseRunner):
         """Run mypy checks."""
         start_time = time.time()
 
-        # MyPy targets are configured in pyproject.toml, but we can override
-        cmd = [sys.executable, "-m", "mypy"]
+        # Use UV to run mypy - this ensures proper environment and PATH resolution
+        cmd = ["uv", "run", "mypy"]
         if target_args:
             cmd.extend(target_args)
 
@@ -270,11 +282,13 @@ class PytestRunner(BaseRunner):
         """Run pytest with coverage."""
         start_time = time.time()
 
+        # Use UV to run pytest - this ensures proper environment and PATH resolution
         cmd = [
-            sys.executable,
-            "-m",
+            "uv",
+            "run",
             "pytest",
-            # Note: --cov=src already in pyproject.toml, only add additional coverage
+            # Explicitly specify all coverage targets to ensure consistent behavior
+            "--cov=src",
             "--cov=api",
             "--cov=scripts",
             # Note: --cov-report=term-missing already in pyproject.toml
@@ -449,6 +463,10 @@ class ValidationScript:
             overall_status=overall_status,
             checks=results,
             summary=self._generate_summary(results),
+            uv_version=env_info.get("uv_version", "unknown"),
+            python_executable=env_info.get("python_executable", ""),
+            path_env=env_info.get("path_env", ""),
+            virtual_env=env_info.get("virtual_env", ""),
         )
 
         # Output report
@@ -457,14 +475,33 @@ class ValidationScript:
         return report
 
     def _get_environment_info(self) -> dict[str, str]:
-        """Get environment information."""
+        """Get environment information with debugging details for CI troubleshooting."""
+        import os
+
         info = {
             "timestamp": datetime.now().isoformat(),
             "python_version": sys.version.split()[0],
             "environment": "development",  # Could be enhanced
             "git_commit": "unknown",
             "git_branch": "unknown",
+            "uv_version": "unknown",
+            "python_executable": sys.executable,
+            "path_env": "",
+            "virtual_env": "",
         }
+
+        # Environment debugging for CI troubleshooting
+        path_env = os.environ.get("PATH", "")
+        info["path_env"] = path_env[:200] + "..." if len(path_env) > 200 else path_env
+        info["virtual_env"] = os.environ.get("VIRTUAL_ENV", "")
+
+        # Get UV version
+        try:
+            uv_result = subprocess.run(["uv", "--version"], capture_output=True, text=True)
+            if uv_result.returncode == 0:
+                info["uv_version"] = uv_result.stdout.strip()
+        except (subprocess.SubprocessError, OSError):
+            pass
 
         # Try to get git info
         try:
@@ -531,6 +568,15 @@ class ValidationScript:
             )
         )
 
+        # Show environment info in verbose mode
+        if verbose:
+            env_info_text = (
+                f"[dim]Python: {report.python_version} | UV: {getattr(report, 'uv_version', 'unknown')}[/dim]"
+            )
+            if hasattr(report, "virtual_env") and report.virtual_env:
+                env_info_text += f"\n[dim]Virtual Env: {report.virtual_env}[/dim]"
+            self.console.print(env_info_text)
+
         # Results table
         table = Table(title="Validation Results")
         table.add_column("Check", style="cyan", width=12)
@@ -554,7 +600,10 @@ class ValidationScript:
                 passed = check.details.get("passed", 0)
                 failed = check.details.get("failed", 0)
                 coverage = check.details.get("coverage_total", 0)
-                details_text = f"{passed} passed, {failed} failed, {coverage}% coverage"
+                details_text = f"{passed} passed, {failed} failed, {coverage:.1f}% coverage"
+                # Add note if coverage failed
+                if not check.passed and failed == 0:
+                    details_text += " (coverage threshold not met)"
 
             table.add_row(check.name, status, duration, details_text)
 
