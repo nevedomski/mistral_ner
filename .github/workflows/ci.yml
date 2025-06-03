@@ -47,12 +47,25 @@ jobs:
 
       - name: Install dependencies
         run: |
+          echo "Creating virtual environment..."
           uv venv
+          echo "Installing package with all dependencies..."
+          uv pip install -e ".[api]"
+          uv pip install -e ".[cuda12]"
           uv pip install -e ".[dev]"
+          echo "Installation complete"
+
+      - name: Verify tools are available
+        run: |
+          echo "Checking installed tools..."
+          uv run ruff --version
+          uv run mypy --version
+          uv run pytest --version
 
       - name: Run comprehensive validation
         run: |
-          uv run python scripts/validate.py --verbose
+          echo "Running validation script..."
+          uv run scripts/validate.py --verbose
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -91,11 +104,13 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
+          uv pip install -e ".[api]"
+          uv pip install -e ".[cuda12]"
           uv pip install -e ".[dev]"
       - name: Run lint checks only
         run: |
-          uv run python scripts/validate.py --ruff-only
-          uv run python scripts/validate.py --mypy-only
+          uv run scripts/validate.py --ruff-only
+          uv run scripts/validate.py --mypy-only
 
   test-only:
     runs-on: ubuntu-latest
@@ -114,10 +129,12 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
+          uv pip install -e ".[api]"
+          uv pip install -e ".[cuda12]"
           uv pip install -e ".[dev]"
       - name: Run tests only
         run: |
-          uv run python scripts/validate.py --tests-only
+          uv run scripts/validate.py --tests-only
 
   build:
     runs-on: ubuntu-latest
