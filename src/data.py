@@ -7,13 +7,22 @@ from collections.abc import Callable
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from datasets import Dataset, DatasetDict, load_dataset
 from transformers import PreTrainedTokenizerBase
+
+from datasets import Dataset, DatasetDict, load_dataset
 
 if TYPE_CHECKING:
     from transformers import DataCollatorForTokenClassification
 
     from .config import Config
+
+# Import multi-dataset components
+try:
+    from .datasets import DatasetMixer, DatasetRegistry, LabelMapper
+
+    MULTI_DATASET_AVAILABLE = True
+except ImportError:
+    MULTI_DATASET_AVAILABLE = False
 
 logger = logging.getLogger("mistral_ner")
 
@@ -127,6 +136,13 @@ def prepare_datasets(
     Returns:
         Tuple of (train_dataset, eval_dataset, test_dataset, data_collator)
     """
+    # Check if multi-dataset mode is enabled
+    if config.data.multi_dataset.enabled:
+        if not MULTI_DATASET_AVAILABLE:
+            raise ImportError("Multi-dataset components not available. Check installation.")
+        return prepare_multi_datasets(tokenizer, config)
+
+    # Single dataset mode (backward compatibility)
     # Load dataset if not provided
     if dataset is None:
         dataset = load_conll2003_dataset()
@@ -235,3 +251,104 @@ def print_dataset_statistics(dataset: DatasetDict, tokenizer: PreTrainedTokenize
                         print(f"    {label_names[tag_id]}: {count}")
 
     print("=" * 50 + "\n")
+
+
+def prepare_multi_datasets(
+    tokenizer: PreTrainedTokenizerBase, config: Config
+) -> tuple[Dataset, Dataset, Dataset, DataCollatorForTokenClassification]:
+    """
+    Prepare multiple datasets for training.
+
+    Args:
+        tokenizer: Tokenizer to use
+        config: Configuration object with multi-dataset settings
+
+    Returns:
+        Tuple of (train_dataset, eval_dataset, test_dataset, data_collator)
+    """
+    logger.info("Preparing multi-dataset training...")
+
+    # Initialize components
+    registry = DatasetRegistry()
+    label_mapper = LabelMapper(config.data.label_names)
+
+    # Load all requested datasets
+    all_datasets = []
+    dataset_names = config.data.multi_dataset.dataset_names
+
+    for i, dataset_name in enumerate(dataset_names):
+        logger.info(f"Loading dataset {i + 1}/{len(dataset_names)}: {dataset_name}")
+
+        # Get dataset-specific config if needed
+        dataset_config = {
+            "language": (config.data.multi_dataset.filter_english and "English") or None,
+        }
+
+        # Load dataset
+        loader = registry.get_loader(dataset_name, dataset_config)
+        dataset = loader.load()
+
+        # Get label mapping for this dataset
+        label_mapping = loader.get_label_mapping()
+
+        # Apply label mapping to unify schema
+        logger.info(f"Mapping labels for {dataset_name}")
+        dataset = dataset.map(
+            lambda x, mapping=label_mapping: label_mapper.map_labels(x, mapping),
+            batched=True,
+            desc=f"Mapping labels for {dataset_name}",
+        )
+
+        # Apply dataset-specific preprocessing
+        dataset = dataset.map(loader.preprocess, batched=True, desc=f"Preprocessing {dataset_name}")
+
+        # Add dataset source identifier
+        dataset = dataset.map(
+            lambda x, name=dataset_name: {"dataset_source": name}, desc=f"Adding source for {dataset_name}"
+        )
+
+        # Limit samples if configured
+        if config.data.multi_dataset.max_samples_per_dataset:
+            max_samples = config.data.multi_dataset.max_samples_per_dataset
+            for split in dataset:
+                if len(dataset[split]) > max_samples:
+                    dataset[split] = dataset[split].select(range(max_samples))
+                    logger.info(f"Limited {split} split to {max_samples} samples")
+
+        all_datasets.append(dataset)
+
+    # Mix datasets according to strategy
+    logger.info(f"Mixing datasets using strategy: {config.data.multi_dataset.mixing_strategy}")
+    mixed_dataset = DatasetMixer.mix(
+        all_datasets,
+        strategy=config.data.multi_dataset.mixing_strategy,
+        weights=config.data.multi_dataset.dataset_weights,
+        seed=config.training.data_seed,
+    )
+
+    # Print statistics
+    logger.info("Mixed dataset statistics:")
+    for split, data in mixed_dataset.items():
+        logger.info(f"  {split}: {len(data)} examples")
+
+    # Create tokenization function
+    tokenize_fn: Callable[[dict[str, Any]], dict[str, Any]] = partial(
+        tokenize_and_align_labels,
+        tokenizer=tokenizer,
+        max_length=config.data.max_length,
+        label_all_tokens=config.data.label_all_tokens,
+    )
+
+    # Tokenize mixed dataset
+    logger.info("Tokenizing mixed dataset...")
+    tokenized_datasets = mixed_dataset.map(
+        tokenize_fn, batched=True, remove_columns=mixed_dataset["train"].column_names, desc="Tokenizing"
+    )
+
+    # Create data collator
+    data_collator = create_data_collator(tokenizer)
+
+    # Handle missing test split
+    test_dataset = tokenized_datasets.get("test", tokenized_datasets["validation"])
+
+    return (tokenized_datasets["train"], tokenized_datasets["validation"], test_dataset, data_collator)
