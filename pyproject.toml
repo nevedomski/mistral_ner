@@ -109,7 +109,7 @@ exclude = [
     "models",
     "mlruns",
     "logs",
-    "wandb",
+    "wandb_logs",
 ]
 
 [tool.ruff.lint]

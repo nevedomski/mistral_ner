@@ -235,7 +235,7 @@ class LoggingConfig:
     wandb_tags: list[str] = field(default_factory=list)
     wandb_notes: str | None = None
     wandb_mode: str = "online"  # online, offline, disabled
-    wandb_dir: str = "./wandb"  # Directory for offline runs
+    wandb_dir: str = "./wandb_logs"  # Directory for offline runs
     wandb_resume: str = "allow"  # allow, must, never, auto
     wandb_run_id: str | None = None  # For resuming specific runs
     wandb_api_key: str | None = None  # API key (can be set via env var)

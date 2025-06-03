@@ -100,3 +100,6 @@ test-results.xml
 # git
 mistral_ner_agents/
 
+# Wandb logs
+wandb_logs/
+

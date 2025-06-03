@@ -115,7 +115,7 @@ logging:
   wandb_tags: []      # Add tags like ["experiment", "baseline"]
   wandb_notes: null   # Add experiment notes
   wandb_mode: "online"  # online, offline, disabled
-  wandb_dir: "./wandb"  # Directory for offline runs
+  wandb_dir: "./wandb_logs"  # Directory for offline runs
   wandb_resume: "allow"  # allow, must, never, auto
   wandb_run_id: null  # For resuming specific runs
   wandb_api_key: null  # Set via WANDB_API_KEY env var or specify here
