@@ -77,8 +77,8 @@ class TestCreateLoraConfig:
         lora_config = create_lora_config(sample_config)
 
         assert isinstance(lora_config, LoraConfig)
-        assert lora_config.r == 16
-        assert lora_config.lora_alpha == 32
+        assert lora_config.r == 32
+        assert lora_config.lora_alpha == 64
         assert lora_config.lora_dropout == 0.1
         assert lora_config.bias == "none"
         assert lora_config.task_type == TaskType.TOKEN_CLS
@@ -86,8 +86,8 @@ class TestCreateLoraConfig:
     @patch("src.model.LoraConfig")
     def test_create_lora_config_custom(self, mock_lora_config, sample_config):
         """Test creating LoRA config with custom values."""
-        sample_config.model.lora_r = 32
-        sample_config.model.lora_alpha = 64
+        sample_config.model.lora_r = 64
+        sample_config.model.lora_alpha = 128
         sample_config.model.lora_dropout = 0.05
         sample_config.model.target_modules = ["q_proj", "v_proj"]
 
@@ -98,8 +98,8 @@ class TestCreateLoraConfig:
 
         assert lora_config == mock_config
         mock_lora_config.assert_called_once_with(
-            r=32,
-            lora_alpha=64,
+            r=64,
+            lora_alpha=128,
             target_modules=["q_proj", "v_proj"],
             lora_dropout=0.05,
             bias="none",
@@ -355,7 +355,7 @@ class TestSetupModel:
         assert tokenizer == mock_tokenizer
 
         mock_load_tokenizer.assert_called_once_with("test-model")
-        mock_create_bnb.assert_called_once_with(True)  # Default load_in_8bit=True
+        mock_create_bnb.assert_called_once_with(False, True)  # Default load_in_8bit=False, load_in_4bit=True
         mock_load_base.assert_called_once_with("test-model", sample_config, mock_bnb_config)
         mock_create_lora.assert_called_once_with(sample_config)
         mock_setup_peft.assert_called_once_with(mock_base_model, mock_lora_config)
@@ -370,6 +370,7 @@ class TestSetupModel:
     ):
         """Test model setup without quantization."""
         sample_config.model.load_in_8bit = False
+        sample_config.model.load_in_4bit = False
 
         mock_tokenizer = Mock()
         mock_base_model = Mock()

@@ -19,17 +19,28 @@ class ModelConfig:
 
     model_name: str = "mistralai/Mistral-7B-v0.3"
     num_labels: int = 9
-    load_in_8bit: bool = True
+    load_in_8bit: bool = False  # Updated default for QLoRA
+    load_in_4bit: bool = True  # Added 4-bit quantization support
     device_map: str = "auto"
     trust_remote_code: bool = True
     use_cache: bool = False
 
-    # LoRA configuration
-    lora_r: int = 16
-    lora_alpha: int = 32
+    # LoRA configuration - Enhanced for better capacity
+    lora_r: int = 32  # Increased from 16 for better capacity
+    lora_alpha: int = 64  # Increased proportionally (2x rank)
     lora_dropout: float = 0.1
     lora_bias: str = "none"
-    target_modules: list[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj", "o_proj"])
+    target_modules: list[str] = field(
+        default_factory=lambda: [
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",  # Attention projections
+            "gate_proj",
+            "up_proj",
+            "down_proj",  # MLP projections
+        ]
+    )
     task_type: str = "TOKEN_CLS"
 
 
@@ -155,6 +166,17 @@ class TrainingConfig:
     weight_decay: float = 0.001
     warmup_ratio: float = 0.03
     max_grad_norm: float = 1.0
+
+    # Loss function configuration
+    loss_type: str = "focal"  # 'focal', 'cross_entropy', 'label_smoothing', 'class_balanced'
+    focal_alpha: float | None = None  # Auto-computed from class frequencies if None
+    focal_gamma: float = 2.0  # Focusing parameter for focal loss
+    label_smoothing: float = 0.1  # Only used if loss_type='label_smoothing'
+    class_balanced_beta: float = 0.9999  # Only used if loss_type='class_balanced'
+
+    # Learning rate scheduling
+    lr_scheduler_type: str = "cosine"  # 'linear', 'cosine', 'cosine_with_restarts', 'polynomial'
+    lr_scheduler_kwargs: dict[str, Any] = field(default_factory=dict)  # Additional scheduler params
 
     # Training strategy
     eval_strategy: str = "epoch"
