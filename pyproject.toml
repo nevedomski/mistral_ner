@@ -32,6 +32,8 @@ dependencies = [
     "wandb>=0.16.0",
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
+    "ray[tune]>=2.46.0",
+    "optuna>=4.3.0",
 ]
 
 [project.optional-dependencies]
@@ -67,6 +69,8 @@ dev = [
     "torchaudio>=2.7.0", 
     "torchvision>=0.22.0",
     "httpx>=0.24.0",
+    "ray[tune]>=2.46.0",
+    "optuna>=4.3.0",
 ]
 cuda11 = [
     "torch>=2.7.0",

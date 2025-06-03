@@ -159,20 +159,84 @@ def main() -> None:
                 logger.info(f"Test metrics: {test_metrics}")
 
         else:
-            # Training mode
-            logger.info("Starting training pipeline...")
+            # Check if hyperparameter optimization is enabled
+            if hasattr(config, "hyperopt") and hasattr(config.hyperopt, "enabled") and config.hyperopt.enabled:
+                logger.info("Hyperparameter optimization enabled - running optimization...")
 
-            # Run training
-            train_metrics = run_training_pipeline(
-                model=model,
-                tokenizer=tokenizer,
-                train_dataset=train_dataset,
-                eval_dataset=eval_dataset,
-                data_collator=data_collator,
-                config=config,
-            )
+                from src.hyperopt import HyperparameterOptimizer, create_objective_function
+                from src.hyperopt.utils import create_ray_tune_search_space
 
-            logger.info(f"Training completed. Final metrics: {train_metrics}")
+                # Create search space
+                search_space = create_ray_tune_search_space(config.hyperopt)
+
+                # Create objective function
+                objective_func = create_objective_function(
+                    base_config=config,
+                    hyperopt_config=config.hyperopt,
+                    train_dataset=train_dataset,
+                    eval_dataset=eval_dataset,
+                    data_collator=data_collator,
+                )
+
+                # Run optimization
+                with HyperparameterOptimizer(config.hyperopt) as optimizer:
+                    results = optimizer.optimize(
+                        objective_func=objective_func,
+                        search_space=search_space,
+                        base_config=config,
+                    )
+
+                    # Get best configuration and run final training
+                    best_result = results.get_best_result(config.hyperopt.metric, config.hyperopt.mode)
+                    logger.info(f"Best hyperparameters found: {best_result.config}")
+
+                    # Update config with best hyperparameters and run final training
+                    for param_name, param_value in (best_result.config or {}).items():
+                        if param_name == "learning_rate":
+                            config.training.learning_rate = param_value
+                        elif param_name == "lora_r":
+                            config.model.lora_r = param_value
+                        elif param_name == "per_device_train_batch_size":
+                            config.training.per_device_train_batch_size = param_value
+                        elif param_name == "warmup_ratio":
+                            config.training.warmup_ratio = param_value
+                        elif param_name == "weight_decay":
+                            config.training.weight_decay = param_value
+
+                    logger.info("Running final training with best hyperparameters...")
+
+                    # Re-setup model with best hyperparameters
+                    model, tokenizer = setup_model(model_name=config.model.model_name, config=config)
+
+                    # Re-enable WandB for final training
+                    config.logging.use_wandb = True
+                    config.training.report_to = ["wandb"]
+
+                    train_metrics = run_training_pipeline(
+                        model=model,
+                        tokenizer=tokenizer,
+                        train_dataset=train_dataset,
+                        eval_dataset=eval_dataset,
+                        data_collator=data_collator,
+                        config=config,
+                    )
+
+                    logger.info(f"Final training completed. Metrics: {train_metrics}")
+            else:
+                # Regular training mode
+                logger.info("Starting training pipeline...")
+
+                # Run training
+                train_metrics = run_training_pipeline(
+                    model=model,
+                    tokenizer=tokenizer,
+                    train_dataset=train_dataset,
+                    eval_dataset=eval_dataset,
+                    data_collator=data_collator,
+                    config=config,
+                )
+
+                logger.info(f"Training completed. Final metrics: {train_metrics}")
 
             # Evaluate on test set if requested
             if args.test:
