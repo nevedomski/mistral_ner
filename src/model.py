@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("mistral_ner")
 
 
-def create_bnb_config(load_in_8bit: bool = True) -> BitsAndBytesConfig:
+def create_bnb_config(load_in_8bit: bool = False, load_in_4bit: bool = True) -> BitsAndBytesConfig:
     """Create BitsAndBytes configuration for model quantization."""
     if load_in_8bit:
         bnb_config = BitsAndBytesConfig(
@@ -33,14 +33,18 @@ def create_bnb_config(load_in_8bit: bool = True) -> BitsAndBytesConfig:
             bnb_8bit_use_double_quant=True,
         )
         logger.info("Created 8-bit quantization config")
-    else:
+    elif load_in_4bit:
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
         )
-        logger.info("Created 4-bit quantization config")
+        logger.info("Created 4-bit quantization config (QLoRA)")
+    else:
+        # No quantization
+        bnb_config = None
+        logger.info("No quantization config - using full precision")
 
     return bnb_config
 
@@ -212,7 +216,12 @@ def setup_model(
     tokenizer = load_tokenizer(model_name)
 
     # Create quantization config
-    bnb_config = create_bnb_config(config.model.load_in_8bit) if config.model.load_in_8bit else None
+    load_in_4bit = getattr(config.model, "load_in_4bit", False)
+    bnb_config = (
+        create_bnb_config(config.model.load_in_8bit, load_in_4bit)
+        if (config.model.load_in_8bit or load_in_4bit)
+        else None
+    )
 
     # Load base model
     model = load_base_model(model_name, config, bnb_config)
@@ -259,7 +268,12 @@ def load_model_from_checkpoint(
             base_model_name = config.model.model_name
 
         # Create quantization config
-        bnb_config = create_bnb_config(config.model.load_in_8bit) if config.model.load_in_8bit else None
+        load_in_4bit = getattr(config.model, "load_in_4bit", False)
+        bnb_config = (
+            create_bnb_config(config.model.load_in_8bit, load_in_4bit)
+            if (config.model.load_in_8bit or load_in_4bit)
+            else None
+        )
 
         # Load base model
         base_model = load_base_model(base_model_name, config, bnb_config)

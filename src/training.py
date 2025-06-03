@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
+import wandb
 from datasets import Dataset
 from transformers import (
     EarlyStoppingCallback,
@@ -22,9 +23,9 @@ from transformers import (
 )
 from transformers.integrations import WandbCallback
 
-import wandb
-
 from .evaluation import compute_metrics_factory, load_seqeval_metric
+from .losses import compute_class_frequencies, create_loss_function
+from .schedulers import create_scheduler
 from .utils import check_gpu_memory, clear_gpu_cache, detect_mixed_precision_support
 
 if TYPE_CHECKING:
@@ -182,8 +183,9 @@ class TrainingManager:
         if self.config.logging.use_wandb and "wandb" in self.config.training.report_to:
             callbacks.append(CustomWandbCallback())
 
-        # Create trainer
-        trainer = Trainer(
+        # Create custom trainer with focal loss support
+        CustomTrainerClass = create_custom_trainer_class(self.config, train_dataset)
+        trainer = CustomTrainerClass(
             model=model,
             args=training_args,
             train_dataset=train_dataset,
@@ -249,18 +251,111 @@ class TrainingManager:
                 wandb.finish()
 
 
-def create_custom_trainer_class(config: Config) -> type[Trainer]:
+def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = None) -> type[Trainer]:
     """Create a custom Trainer class with additional features."""
 
+    # Setup custom loss function if not using standard cross-entropy
+    custom_loss_fn = None
+    if config.training.loss_type != "cross_entropy":
+        logger.info(f"Setting up custom loss function: {config.training.loss_type}")
+
+        # Compute class frequencies if needed
+        class_frequencies = None
+        if config.training.loss_type in ["class_balanced"] or (
+            config.training.loss_type == "focal" and config.training.focal_alpha is None
+        ):
+            if train_dataset is not None:
+                class_frequencies = compute_class_frequencies(train_dataset, "labels")
+            else:
+                logger.warning("No train_dataset provided for class frequency computation")
+
+        # Create loss function with proper type handling
+        if config.training.loss_type == "focal":
+            focal_alpha: float | list[float] | None = config.training.focal_alpha
+            # Auto-compute alpha from class frequencies if not specified
+            if config.training.focal_alpha is None and class_frequencies is not None:
+                # Compute inverse frequency weights
+                total_samples = sum(class_frequencies)
+                alpha_weights = [total_samples / (len(class_frequencies) * freq) for freq in class_frequencies]
+                focal_alpha = alpha_weights
+                logger.info(f"Auto-computed focal loss alpha weights: {alpha_weights}")
+
+            custom_loss_fn = create_loss_function(
+                loss_type=config.training.loss_type,
+                num_labels=config.model.num_labels,
+                gamma=config.training.focal_gamma,
+                alpha=focal_alpha,
+            )
+        elif config.training.loss_type == "label_smoothing":
+            custom_loss_fn = create_loss_function(
+                loss_type=config.training.loss_type,
+                num_labels=config.model.num_labels,
+                smoothing=config.training.label_smoothing,
+            )
+        elif config.training.loss_type == "class_balanced":
+            if class_frequencies is None:
+                raise ValueError("class_frequencies required for class_balanced loss")
+            custom_loss_fn = create_loss_function(
+                loss_type=config.training.loss_type,
+                num_labels=config.model.num_labels,
+                class_frequencies=class_frequencies,
+                beta=config.training.class_balanced_beta,
+            )
+        else:
+            custom_loss_fn = create_loss_function(
+                loss_type=config.training.loss_type,
+                num_labels=config.model.num_labels,
+            )
+
     class CustomTrainer(Trainer):
-        """Custom trainer with enhanced error handling and logging."""
+        """Custom trainer with enhanced error handling, logging, and focal loss support."""
+
+        def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None) -> Any:
+            """Create custom learning rate scheduler."""
+            if config.training.lr_scheduler_type not in ["linear"]:
+                # Use our custom scheduler
+                if optimizer is None:
+                    optimizer = self.optimizer
+
+                scheduler = create_scheduler(
+                    optimizer=optimizer,
+                    scheduler_type=config.training.lr_scheduler_type,
+                    training_args=self.args,
+                    num_training_steps=num_training_steps,
+                    **config.training.lr_scheduler_kwargs,
+                )
+                return scheduler
+            else:
+                # Use default transformers scheduler
+                return super().create_scheduler(num_training_steps, optimizer)
 
         def compute_loss(
             self, model: PreTrainedModel, inputs: dict[str, Any], return_outputs: bool = False
         ) -> torch.Tensor | tuple[torch.Tensor, Any]:
-            """Override compute_loss to add custom error handling."""
+            """Override compute_loss to use custom loss functions."""
             try:
-                return super().compute_loss(model, inputs, return_outputs)
+                if custom_loss_fn is not None:
+                    # Use custom loss function
+                    labels = inputs.get("labels")
+                    if labels is None:
+                        raise ValueError("No labels found in inputs for custom loss computation")
+
+                    # Forward pass
+                    outputs = model(**inputs)
+                    logits = outputs.get("logits")
+                    if logits is None:
+                        raise ValueError("No logits found in model outputs")
+
+                    # Compute custom loss
+                    loss = custom_loss_fn(logits, labels)
+
+                    if return_outputs:
+                        return (loss, outputs)
+                    return loss
+                else:
+                    # Use default loss computation
+                    return super().compute_loss(model, inputs, return_outputs)
+
             except torch.cuda.OutOfMemoryError:
                 logger.error("OOM in compute_loss, clearing cache and retrying...")
                 clear_gpu_cache()

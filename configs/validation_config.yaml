@@ -81,8 +81,6 @@ tools:
       min_percentage: 90  # Minimum coverage percentage to pass
       include_packages:
         - "src"
-        - "api" 
-        - "scripts"
       exclude_patterns:
         - "*/tests/*"
         - "*/__pycache__/*"

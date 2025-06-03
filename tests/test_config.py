@@ -19,8 +19,9 @@ def test_default_config():
     # Check model config
     assert config.model.model_name == "mistralai/Mistral-7B-v0.3"
     assert config.model.num_labels == 9
-    assert config.model.load_in_8bit
-    assert config.model.lora_r == 16
+    assert config.model.load_in_4bit  # Changed to 4-bit quantization
+    assert not config.model.load_in_8bit  # 8-bit is now False
+    assert config.model.lora_r == 32  # Increased from 16
 
     # Check data config
     assert config.data.dataset_name == "conll2003"
@@ -253,7 +254,8 @@ def test_update_from_args_missing_attributes():
     # Only model_name should be updated
     assert config.model.model_name == "partial-model"
     # Other values should remain defaults
-    assert config.model.load_in_8bit is True  # default
+    assert config.model.load_in_4bit is True  # default
+    assert config.model.load_in_8bit is False  # now using 4-bit
     assert config.training.output_dir == "./mistral-ner-finetuned"  # default
 
 

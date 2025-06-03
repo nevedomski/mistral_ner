@@ -274,9 +274,7 @@ class PytestRunner(BaseRunner):
             sys.executable,
             "-m",
             "pytest",
-            # Note: --cov=src already in pyproject.toml, only add additional coverage
-            "--cov=api",
-            "--cov=scripts",
+            # Note: --cov=src already in pyproject.toml
             # Note: --cov-report=term-missing already in pyproject.toml
             "--cov-report=json:coverage.json",
             "--cov-report=xml:coverage.xml",

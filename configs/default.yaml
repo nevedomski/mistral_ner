@@ -3,21 +3,25 @@
 model:
   model_name: "mistralai/Mistral-7B-v0.3"
   num_labels: 9
-  load_in_8bit: true
+  load_in_8bit: false   # Disabled 8-bit quantization
+  load_in_4bit: true    # Enabled 4-bit quantization (QLoRA)
   device_map: "auto"
   trust_remote_code: true
   use_cache: false
   
-  # LoRA configuration
-  lora_r: 16
-  lora_alpha: 32
+  # LoRA configuration - Enhanced for better capacity
+  lora_r: 32  # Increased from 16 for better capacity
+  lora_alpha: 64  # Increased proportionally (2x rank)
   lora_dropout: 0.1
   lora_bias: "none"
   target_modules:
-    - "q_proj"
-    - "k_proj"
-    - "v_proj"
-    - "o_proj"
+    - "q_proj"      # Query projection
+    - "k_proj"      # Key projection  
+    - "v_proj"      # Value projection
+    - "o_proj"      # Output projection
+    - "gate_proj"   # MLP gate projection
+    - "up_proj"     # MLP up projection
+    - "down_proj"   # MLP down projection
   task_type: "TOKEN_CLS"
 
 data:
@@ -51,6 +55,17 @@ training:
   weight_decay: 0.001
   warmup_ratio: 0.03
   max_grad_norm: 1.0
+  
+  # Loss function configuration
+  loss_type: "focal"  # focal, cross_entropy, label_smoothing, class_balanced
+  focal_alpha: null   # Auto-computed from class frequencies if null
+  focal_gamma: 2.0    # Focusing parameter for focal loss
+  label_smoothing: 0.1  # Only used if loss_type='label_smoothing'
+  class_balanced_beta: 0.9999  # Only used if loss_type='class_balanced'
+  
+  # Learning rate scheduling
+  lr_scheduler_type: "cosine"  # linear, cosine, cosine_with_restarts, polynomial
+  lr_scheduler_kwargs: {}  # Additional scheduler parameters
   
   # Training strategy
   eval_strategy: "epoch"
