@@ -34,22 +34,107 @@ class ModelConfig:
 
 
 @dataclass
+class MultiDatasetConfig:
+    """Configuration for multi-dataset training."""
+
+    enabled: bool = False  # Enable multi-dataset mode
+    dataset_names: list[str] = field(default_factory=lambda: ["conll2003"])
+    dataset_weights: list[float] | None = None  # None = equal weights
+    mixing_strategy: str = "interleave"  # "concat", "interleave", "weighted"
+    filter_english: bool = True  # For multilingual datasets
+    max_samples_per_dataset: int | None = None  # For memory management
+
+    # Unified label schema - comprehensive set covering all datasets
+    unified_labels: list[str] = field(
+        default_factory=lambda: [
+            "O",
+            # Core entities
+            "B-PER",
+            "I-PER",  # Person
+            "B-ORG",
+            "I-ORG",  # Organization
+            "B-LOC",
+            "I-LOC",  # Location
+            "B-MISC",
+            "I-MISC",  # Miscellaneous
+            # Extended entities
+            "B-DATE",
+            "I-DATE",  # Date
+            "B-TIME",
+            "I-TIME",  # Time
+            "B-MONEY",
+            "I-MONEY",  # Money
+            "B-PERCENT",
+            "I-PERCENT",  # Percentage
+            "B-FAC",
+            "I-FAC",  # Facility
+            "B-GPE",
+            "I-GPE",  # Geopolitical entity
+            "B-PROD",
+            "I-PROD",  # Product
+            "B-EVENT",
+            "I-EVENT",  # Event
+            "B-ART",
+            "I-ART",  # Work of art
+            "B-LANG",
+            "I-LANG",  # Language
+            "B-LAW",
+            "I-LAW",  # Law
+            # PII entities
+            "B-CARD",
+            "I-CARD",  # Credit card
+            "B-SSN",
+            "I-SSN",  # Social Security Number
+            "B-PHONE",
+            "I-PHONE",  # Phone number
+            "B-EMAIL",
+            "I-EMAIL",  # Email
+            "B-ADDR",
+            "I-ADDR",  # Address
+            "B-BANK",
+            "I-BANK",  # Bank account
+            "B-PASSPORT",
+            "I-PASSPORT",  # Passport
+            "B-LICENSE",
+            "I-LICENSE",  # Driver's license
+            # Numeric entities
+            "B-QUANT",
+            "I-QUANT",  # Quantity
+            "B-ORD",
+            "I-ORD",  # Ordinal
+            "B-CARD_NUM",
+            "I-CARD_NUM",  # Cardinal number
+            "B-NORP",
+            "I-NORP",  # Nationality, religious, political group
+        ]
+    )
+
+
+@dataclass
 class DataConfig:
     """Data configuration."""
 
-    dataset_name: str = "conll2003"
+    dataset_name: str = "conll2003"  # For single dataset mode
     max_length: int = 256
     label_all_tokens: bool = False
     return_entity_level_metrics: bool = True
 
-    # Label configuration
-    label_names: list[str] = field(
-        default_factory=lambda: ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
-    )
+    # Multi-dataset configuration
+    multi_dataset: MultiDatasetConfig = field(default_factory=MultiDatasetConfig)
+
+    # Label configuration - will be set based on mode
+    label_names: list[str] = field(init=False)
     id2label: dict[int, str] = field(init=False)
     label2id: dict[str, int] = field(init=False)
 
     def __post_init__(self) -> None:
+        # Set labels based on mode
+        if self.multi_dataset.enabled:
+            self.label_names = self.multi_dataset.unified_labels
+        else:
+            # Default CoNLL-2003 labels for backward compatibility
+            self.label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
+
         self.id2label = {i: label for i, label in enumerate(self.label_names)}
         self.label2id = {label: i for i, label in enumerate(self.label_names)}
 
@@ -153,7 +238,16 @@ class Config:
         if "model" in config_dict:
             config.model = ModelConfig(**config_dict["model"])
         if "data" in config_dict:
-            config.data = DataConfig(**config_dict["data"])
+            data_dict = config_dict["data"].copy()
+            # Handle nested multi_dataset config
+            if "multi_dataset" in data_dict:
+                multi_dataset_dict = data_dict.pop("multi_dataset")
+                config.data = DataConfig(**data_dict)
+                config.data.multi_dataset = MultiDatasetConfig(**multi_dataset_dict)
+                # Re-initialize labels based on multi-dataset mode
+                config.data.__post_init__()
+            else:
+                config.data = DataConfig(**data_dict)
         if "training" in config_dict:
             config.training = TrainingConfig(**config_dict["training"])
         if "logging" in config_dict:
