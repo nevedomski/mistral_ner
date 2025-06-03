@@ -382,26 +382,39 @@ class TestValidationScript:
     @patch("subprocess.run")
     def test_get_environment_info(self, mock_run):
         """Test getting environment information."""
-        mock_run.side_effect = [MagicMock(returncode=0, stdout="abcd1234efgh"), MagicMock(returncode=0, stdout="main")]
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="uv 0.7.9"),  # UV version
+            MagicMock(returncode=0, stdout="abcd1234efgh"),  # Git commit
+            MagicMock(returncode=0, stdout="main"),  # Git branch
+        ]
 
         script = ValidationScript()
         info = script._get_environment_info()
 
         assert info["git_commit"] == "abcd1234"
         assert info["git_branch"] == "main"
+        assert info["uv_version"] == "uv 0.7.9"
         assert "timestamp" in info
         assert "python_version" in info
+        assert "python_executable" in info
+        assert "path_env" in info
+        assert "virtual_env" in info
 
     @patch("subprocess.run")
     def test_get_environment_info_git_failure(self, mock_run):
         """Test getting environment info when git fails."""
-        mock_run.side_effect = [MagicMock(returncode=1, stdout=""), MagicMock(returncode=1, stdout="")]
+        mock_run.side_effect = [
+            MagicMock(returncode=1, stdout=""),  # UV version fails
+            MagicMock(returncode=1, stdout=""),  # Git commit fails
+            MagicMock(returncode=1, stdout=""),  # Git branch fails
+        ]
 
         script = ValidationScript()
         info = script._get_environment_info()
 
         assert info["git_commit"] == "unknown"
         assert info["git_branch"] == "unknown"
+        assert info["uv_version"] == "unknown"
 
     def test_generate_summary(self):
         """Test generating summary statistics."""
@@ -615,9 +628,10 @@ class TestIntegration:
         """Test end-to-end validation with mocked subprocess calls."""
         # Mock successful tool runs
         mock_run.side_effect = [
-            # Git commands for environment info
-            MagicMock(returncode=0, stdout="abcd1234"),
-            MagicMock(returncode=0, stdout="main"),
+            # Environment info commands
+            MagicMock(returncode=0, stdout="uv 0.7.9"),  # UV version
+            MagicMock(returncode=0, stdout="abcd1234"),  # Git commit
+            MagicMock(returncode=0, stdout="main"),  # Git branch
             # Ruff check and format
             MagicMock(returncode=0, stdout="", stderr=""),
             MagicMock(returncode=0, stdout="", stderr=""),
