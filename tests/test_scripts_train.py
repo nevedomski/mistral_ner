@@ -164,6 +164,8 @@ class TestMain:
         mock_config.model.model_name = "test-model"
         mock_config.data.label_names = ["O", "B-PER"]
         mock_config.training.per_device_eval_batch_size = 8
+        # Ensure hyperopt is disabled in the mock
+        mock_config.hyperopt.enabled = False
         mock_config_from_yaml.return_value = mock_config
 
         mock_logger = Mock()
@@ -245,6 +247,8 @@ class TestMain:
         mock_config.model.model_name = "test-model"
         mock_config.data.label_names = ["O", "B-PER"]
         mock_config.training.per_device_eval_batch_size = 8
+        # Ensure hyperopt is disabled in the mock
+        mock_config.hyperopt.enabled = False
         mock_config_from_yaml.return_value = mock_config
 
         mock_logger = Mock()
@@ -325,6 +329,8 @@ class TestMain:
         mock_config.data.label_names = ["O", "B-PER"]
         mock_config.training.per_device_eval_batch_size = 8
         mock_config.training.output_dir = "./output"
+        # Ensure hyperopt is disabled in the mock
+        mock_config.hyperopt.enabled = False
         mock_config_from_yaml.return_value = mock_config
 
         mock_logger = Mock()
@@ -573,6 +579,8 @@ class TestMainExecution:
         mock_config.model.model_name = "test-model"
         mock_config.data.label_names = ["O", "B-PER"]
         mock_config.training.per_device_eval_batch_size = 8
+        # Ensure hyperopt is disabled in the mock
+        mock_config.hyperopt.enabled = False
         mock_config_from_yaml.return_value = mock_config
 
         mock_logger = Mock()
@@ -649,6 +657,8 @@ class TestMainExecution:
         mock_config.data.label_names = ["O", "B-PER"]
         mock_config.training.per_device_eval_batch_size = 8
         mock_config.training.output_dir = "./output"
+        # Ensure hyperopt is disabled in the mock
+        mock_config.hyperopt.enabled = False
         mock_config_from_yaml.return_value = mock_config
 
         mock_logger = Mock()

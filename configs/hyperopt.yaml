@@ -1,0 +1,170 @@
+# Hyperparameter optimization configuration for Mistral NER
+# This config enables combined Bayesian optimization (Optuna) + Hyperband (ASHA)
+
+# Model configuration
+model:
+  model_name: "mistralai/Mistral-7B-v0.3"
+  num_labels: 9
+  load_in_8bit: true
+  device_map: "auto"
+  trust_remote_code: true
+  use_cache: false
+  
+  # LoRA configuration (will be optimized)
+  lora_r: 16  # Default value, will be optimized
+  lora_alpha: 32
+  lora_dropout: 0.1
+  lora_bias: "none"
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  task_type: "TOKEN_CLS"
+
+# Data configuration
+data:
+  dataset_name: "conll2003"
+  max_length: 256
+  label_all_tokens: false
+  return_entity_level_metrics: true
+  label_names: ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
+
+# Training configuration
+training:
+  output_dir: "./mistral-ner-finetuned"
+  final_output_dir: "./mistral-ner-finetuned-final"
+  num_train_epochs: 3  # Reduced for optimization trials
+  per_device_train_batch_size: 4  # Default value, will be optimized
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  optim: "paged_adamw_32bit"
+  learning_rate: 2e-4  # Default value, will be optimized
+  weight_decay: 0.001  # Default value, will be optimized
+  warmup_ratio: 0.03  # Default value, will be optimized
+  max_grad_norm: 1.0
+  
+  # Evaluation and saving
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  logging_steps: 10
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1"
+  greater_is_better: true
+  report_to: ["wandb"]
+  
+  # Mixed precision
+  fp16: false
+  bf16: false
+  tf32: true
+  
+  # Early stopping
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.01
+  
+  # Memory management
+  clear_cache_steps: 50
+  
+  # Seed
+  seed: 42
+  data_seed: 42
+  
+  # Distributed training
+  local_rank: -1
+  ddp_find_unused_parameters: false
+  
+  # Hub
+  push_to_hub: false
+
+# Logging configuration
+logging:
+  log_level: "info"
+  log_dir: "./logs"
+  disable_tqdm: false
+  
+  # WandB configuration (disabled for individual trials, enabled for final training)
+  use_wandb: true
+  wandb_project: "mistral-ner-hyperopt"
+  wandb_entity: null
+  wandb_name: null
+  wandb_tags: ["hyperopt", "mistral", "ner"]
+  wandb_notes: "Hyperparameter optimization with combined Bayesian + Hyperband"
+  wandb_mode: "online"
+  wandb_dir: "./wandb"
+  wandb_resume: "allow"
+  wandb_run_id: null
+  wandb_api_key: null
+
+# 🎯 HYPERPARAMETER OPTIMIZATION CONFIGURATION
+hyperopt:
+  # Main control
+  enabled: true
+  strategy: "combined"  # optuna, asha, combined, random
+  
+  # Trial settings
+  num_trials: 50
+  max_concurrent: 4
+  timeout: 7200  # 2 hours
+  
+  # Component toggles
+  optuna_enabled: true
+  asha_enabled: true
+  
+  # Optuna settings (Bayesian optimization)
+  optuna_sampler: "TPE"  # TPE, CMA, Random, GPSampler
+  optuna_pruner: "median"  # median, hyperband, none
+  optuna_n_startup_trials: 10
+  optuna_n_warmup_steps: 0
+  
+  # ASHA settings (Hyperband early stopping)
+  asha_max_t: 3  # Maximum epochs for trials
+  asha_grace_period: 1  # Minimum epochs before stopping
+  asha_reduction_factor: 3
+  asha_brackets: 1
+  
+  # Optimization metrics
+  metric: "eval_f1"
+  mode: "max"
+  
+  # 🔍 SEARCH SPACE DEFINITION
+  search_space:
+    # Learning rate optimization
+    learning_rate:
+      type: "loguniform"
+      low: 1e-5
+      high: 1e-3
+    
+    # LoRA rank optimization  
+    lora_r:
+      type: "choice"
+      choices: [8, 16, 32, 64]
+    
+    # Batch size optimization
+    per_device_train_batch_size:
+      type: "choice"
+      choices: [4, 8, 16]
+    
+    # Warmup ratio optimization
+    warmup_ratio:
+      type: "uniform"
+      low: 0.0
+      high: 0.1
+    
+    # Weight decay optimization
+    weight_decay:
+      type: "loguniform"
+      low: 1e-4
+      high: 1e-1
+  
+  # Storage and persistence
+  study_name: "mistral_ner_combined_optimization"
+  storage_url: null  # Use in-memory storage
+  
+  # Distributed settings
+  ray_address: null  # Use local Ray cluster
+  resources_per_trial:
+    cpu: 1.0
+    gpu: 1.0
+  
+  # Logging and results
+  log_to_file: true
+  results_dir: "./hyperopt_results"
+  checkpoint_freq: 10

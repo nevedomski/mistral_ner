@@ -10,6 +10,8 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv
 
+from .hyperopt.config import HyperoptConfig
+
 load_dotenv()
 
 
@@ -140,6 +142,7 @@ class Config:
     data: DataConfig = field(default_factory=DataConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    hyperopt: HyperoptConfig = field(default_factory=HyperoptConfig)
 
     @classmethod
     def from_yaml(cls, yaml_path: str | Path) -> Config:
@@ -158,6 +161,8 @@ class Config:
             config.training = TrainingConfig(**config_dict["training"])
         if "logging" in config_dict:
             config.logging = LoggingConfig(**config_dict["logging"])
+        if "hyperopt" in config_dict:
+            config.hyperopt = HyperoptConfig(**config_dict["hyperopt"])
 
         return config
 
@@ -171,6 +176,7 @@ class Config:
             "data": data_dict,
             "training": self.training.__dict__,
             "logging": self.logging.__dict__,
+            "hyperopt": self.hyperopt.__dict__,
         }
 
         with open(yaml_path, "w") as f:
