@@ -116,7 +116,8 @@ class TestTestConfig:
         config = Config()
         assert config.model.model_name == "mistralai/Mistral-7B-v0.3"
         assert config.model.num_labels == 9
-        assert config.model.load_in_8bit
+        assert config.model.load_in_4bit
+        assert not config.model.load_in_8bit
         assert config.data.max_length == 256
         assert config.training.num_train_epochs == 5
 

@@ -40,7 +40,7 @@ def create_scheduler(
         Learning rate scheduler
     """
     # Calculate warmup steps
-    if training_args.warmup_ratio > 0:
+    if training_args.warmup_ratio and training_args.warmup_ratio > 0:
         warmup_steps = int(training_args.warmup_ratio * num_training_steps)
     else:
         warmup_steps = training_args.warmup_steps if hasattr(training_args, "warmup_steps") else 0

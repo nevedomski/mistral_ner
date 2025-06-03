@@ -12,6 +12,7 @@ Runs all quality checks and generates detailed reports:
 """
 
 import argparse
+import html
 import json
 import re
 import subprocess
@@ -563,7 +564,15 @@ class ValidationScript:
         if failed_checks and verbose:
             self.console.print("\n[bold red]Error Details:[/bold red]")
             for check in failed_checks:
-                self.console.print(Panel(escape(check.error), title=f"{check.name} Error", style="red"))
+                # For Ruff and MyPy, the actual errors are in stdout (output field)
+                error_content = ""
+                if check.output.strip():
+                    error_content = check.output
+                elif check.error.strip():
+                    error_content = check.error
+
+                if error_content.strip():
+                    self.console.print(Panel(escape(error_content), title=f"{check.name} Error", style="red"))
 
     def _output_plain_report(self, report: ValidationReport, verbose: bool):
         """Fallback plain text report."""
@@ -579,7 +588,10 @@ class ValidationScript:
             status = "PASS" if check.passed else "FAIL"
             print(f"{check.name:<12} {status:<8} {check.duration:.2f}s")
             if not check.passed and verbose:
-                print(f"  Error: {check.error}")
+                # For Ruff and MyPy, the actual errors are in stdout (output field)
+                error_content = check.output if check.output.strip() else check.error
+                if error_content.strip():
+                    print(f"  Error Details:\n{error_content}")
 
         print(f"{'=' * 60}")
 
@@ -610,7 +622,7 @@ class ValidationScript:
         """Generate HTML report content."""
         status_color = "#28a745" if report.overall_status == "PASSED" else "#dc3545"
 
-        html = f"""
+        html_content = f"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -654,28 +666,36 @@ class ValidationScript:
             status_class = "pass" if check.passed else "fail"
             status_text = "PASSED" if check.passed else "FAILED"
 
-            html += f"""
+            html_content += f"""
     <div class="check {status_class}">
         <h3>{check.name} - {status_text}</h3>
         <p><strong>Duration:</strong> {check.duration:.2f}s | <strong>Exit Code:</strong> {check.exit_code}</p>
 """
 
             if check.details:
-                html += "<h4>Details:</h4><ul>"
+                html_content += "<h4>Details:</h4><ul>"
                 for key, value in check.details.items():
-                    html += f"<li><strong>{key}:</strong> {value}</li>"
-                html += "</ul>"
+                    html_content += f"<li><strong>{key}:</strong> {value}</li>"
+                html_content += "</ul>"
 
-            if check.error and not check.passed:
-                html += f'<div class="details"><strong>Error:</strong><br><pre>{check.error}</pre></div>'
+            if not check.passed:
+                # For Ruff and MyPy, the actual errors are in stdout (output field)
+                error_content = ""
+                if check.output.strip():
+                    error_content = check.output
+                elif check.error.strip():
+                    error_content = check.error
 
-            html += "</div>"
+                if error_content.strip():
+                    html_content += f'<div class="details"><strong>Error Details:</strong><br><pre>{html.escape(error_content)}</pre></div>'
 
-        html += """
+            html_content += "</div>"
+
+        html_content += """
 </body>
 </html>
 """
-        return html
+        return html_content
 
 
 def main():

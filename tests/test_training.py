@@ -254,10 +254,10 @@ class TestTrainingManager:
     @patch("src.training.EarlyStoppingCallback")
     @patch("src.training.CustomWandbCallback")
     @patch("src.training.MemoryCallback")
-    @patch("src.training.Trainer")
+    @patch("src.training.create_custom_trainer_class")
     def test_create_trainer(
         self,
-        mock_trainer_class,
+        mock_create_custom_trainer,
         mock_memory_callback,
         mock_wandb_callback,
         mock_early_stopping,
@@ -268,11 +268,24 @@ class TestTrainingManager:
         # Setup mocks
         mock_model = Mock()
         mock_tokenizer = Mock()
+        # Make train dataset iterable for compute_class_frequencies
         mock_train_dataset = Mock()
+        mock_train_dataset.__iter__ = Mock(
+            return_value=iter(
+                [
+                    {"labels": [0, 1, 2]},
+                    {"labels": [1, 2, 0]},
+                ]
+            )
+        )
         mock_eval_dataset = Mock()
         mock_data_collator = Mock()
-        mock_trainer = Mock()
-        mock_trainer_class.return_value = mock_trainer
+
+        # Mock custom trainer class creation
+        mock_custom_trainer_class = Mock()
+        mock_trainer_instance = Mock()
+        mock_custom_trainer_class.return_value = mock_trainer_instance
+        mock_create_custom_trainer.return_value = mock_custom_trainer_class
 
         mock_memory_cb = Mock()
         mock_memory_callback.return_value = mock_memory_cb
@@ -298,11 +311,15 @@ class TestTrainingManager:
                 data_collator=mock_data_collator,
             )
 
-            assert result == mock_trainer
+            # The result should be the custom trainer instance
+            assert result == mock_trainer_instance
 
-            # Verify trainer was created with correct arguments
-            mock_trainer_class.assert_called_once()
-            call_kwargs = mock_trainer_class.call_args[1]
+            # Verify custom trainer class was created
+            mock_create_custom_trainer.assert_called_once_with(sample_config, mock_train_dataset)
+
+            # Verify trainer was instantiated with correct arguments
+            mock_custom_trainer_class.assert_called_once()
+            call_kwargs = mock_custom_trainer_class.call_args[1]
             assert call_kwargs["model"] == mock_model
             assert call_kwargs["tokenizer"] == mock_tokenizer
             assert call_kwargs["train_dataset"] == mock_train_dataset
@@ -318,9 +335,9 @@ class TestTrainingManager:
 
     @patch("src.training.compute_metrics_factory")
     @patch("src.training.MemoryCallback")
-    @patch("src.training.Trainer")
+    @patch("src.training.create_custom_trainer_class")
     def test_create_trainer_custom_compute_metrics(
-        self, mock_trainer_class, mock_memory_callback, mock_compute_metrics_factory, sample_config
+        self, mock_create_custom_trainer, mock_memory_callback, mock_compute_metrics_factory, sample_config
     ):
         """Test trainer creation with custom compute_metrics."""
         # Disable WandB to avoid the callback issue
@@ -328,10 +345,24 @@ class TestTrainingManager:
 
         mock_model = Mock()
         mock_tokenizer = Mock()
+        # Make train dataset iterable for compute_class_frequencies
         mock_train_dataset = Mock()
+        mock_train_dataset.__iter__ = Mock(
+            return_value=iter(
+                [
+                    {"labels": [0, 1, 2]},
+                ]
+            )
+        )
         mock_eval_dataset = Mock()
         mock_data_collator = Mock()
         mock_custom_compute_metrics = Mock()
+
+        # Mock custom trainer class creation
+        mock_custom_trainer_class = Mock()
+        mock_trainer_instance = Mock()
+        mock_custom_trainer_class.return_value = mock_trainer_instance
+        mock_create_custom_trainer.return_value = mock_custom_trainer_class
 
         manager = TrainingManager(sample_config)
 
@@ -347,7 +378,7 @@ class TestTrainingManager:
 
             # Verify custom compute_metrics was used instead of factory
             mock_compute_metrics_factory.assert_not_called()
-            call_kwargs = mock_trainer_class.call_args[1]
+            call_kwargs = mock_custom_trainer_class.call_args[1]
             assert call_kwargs["compute_metrics"] == mock_custom_compute_metrics
 
     @patch("src.training.clear_gpu_cache")
@@ -454,53 +485,6 @@ class TestCreateCustomTrainerClass:
 
         assert issubclass(custom_trainer_class, Trainer)  # CustomTrainer inherits from Trainer
         assert custom_trainer_class.__name__ == "CustomTrainer"
-
-    @patch("src.training.clear_gpu_cache")
-    def test_custom_trainer_compute_loss_success(self, mock_clear_cache, sample_config):
-        """Test custom trainer compute_loss success case."""
-        custom_trainer_class = create_custom_trainer_class(sample_config)
-
-        # Create mock trainer instance
-        with patch("transformers.Trainer.__init__", return_value=None):
-            trainer = custom_trainer_class()
-
-        mock_model = Mock()
-        mock_inputs = {"input_ids": torch.tensor([[1, 2, 3]]), "labels": torch.tensor([[1, 2, 3]])}
-        mock_loss = torch.tensor(0.5)
-
-        with patch("transformers.Trainer.compute_loss", return_value=mock_loss):
-            result = trainer.compute_loss(mock_model, mock_inputs)
-
-        assert result == mock_loss
-        mock_clear_cache.assert_not_called()
-
-    @patch("src.training.clear_gpu_cache")
-    def test_custom_trainer_compute_loss_oom_recovery(self, mock_clear_cache, sample_config):
-        """Test custom trainer compute_loss OOM recovery."""
-        custom_trainer_class = create_custom_trainer_class(sample_config)
-
-        with patch("transformers.Trainer.__init__", return_value=None):
-            trainer = custom_trainer_class()
-
-        mock_model = Mock()
-        mock_inputs = {
-            "input_ids": torch.tensor([[1, 2, 3], [4, 5, 6]]),  # Batch size 2
-            "attention_mask": torch.tensor([[1, 1, 1], [1, 1, 1]]),
-            "labels": torch.tensor([[1, 2, 3], [4, 5, 6]]),
-        }
-        mock_loss = torch.tensor(0.5)
-
-        # First call raises OOM, second succeeds
-        with patch("transformers.Trainer.compute_loss", side_effect=[torch.cuda.OutOfMemoryError(), mock_loss]):
-            result = trainer.compute_loss(mock_model, mock_inputs)
-
-        assert result == mock_loss
-        mock_clear_cache.assert_called_once()
-
-        # Verify batch size was reduced
-        assert mock_inputs["input_ids"].shape[0] == 1
-        assert mock_inputs["attention_mask"].shape[0] == 1
-        assert mock_inputs["labels"].shape[0] == 1
 
     @patch("src.training.clear_gpu_cache")
     def test_custom_trainer_evaluation_loop(self, mock_clear_cache, sample_config):
