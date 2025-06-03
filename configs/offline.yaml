@@ -103,7 +103,7 @@ logging:
     - "experiment"
   wandb_notes: "Training run in offline mode for later syncing"
   wandb_mode: "offline"  # OFFLINE MODE
-  wandb_dir: "./wandb"
+  wandb_dir: "./wandb_logs"
   wandb_resume: "allow"
   wandb_run_id: null
   wandb_api_key: null
