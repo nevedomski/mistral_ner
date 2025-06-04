@@ -1,0 +1,125 @@
+# Extended multi-dataset training configuration
+# This configuration includes all available NER datasets
+
+model:
+  model_name: "mistralai/Mistral-7B-v0.3"
+  num_labels: 53  # Updated for unified schema
+  load_in_8bit: true
+  device_map: "auto"
+  trust_remote_code: true
+  use_cache: false
+  
+  # LoRA configuration
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.1
+  lora_bias: "none"
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  task_type: "TOKEN_CLS"
+
+data:
+  # Single dataset mode disabled
+  dataset_name: "conll2003"  # Ignored when multi_dataset.enabled = true
+  max_length: 256
+  label_all_tokens: false
+  return_entity_level_metrics: true
+  
+  # Extended multi-dataset configuration
+  multi_dataset:
+    enabled: true
+    
+    # All available datasets (9 total)
+    dataset_names: [
+      # Traditional NER (Tier 1)
+      "conll2003",      # Baseline - 4 entities
+      "ontonotes",      # Large-scale - 18 entities
+      "wnut17",         # Emerging entities - 6 entities
+      "fewnerd",        # Fine-grained - 66 entity types
+      "wikiner",        # Wikipedia NER - 3 entities
+      
+      # PII Detection (Tier 2)
+      "gretel_pii",     # Financial PII - 29+ types
+      "ai4privacy",     # General PII - 54 types
+      "mendeley_pii",   # Synthetic PII - 200k examples
+      # "bigcode_pii"   # Code PII - requires auth token
+    ]
+    
+    # Weights for each dataset (must sum to 1.0)
+    # Adjust based on dataset sizes and importance
+    dataset_weights: [
+      0.15,  # conll2003
+      0.20,  # ontonotes
+      0.10,  # wnut17
+      0.15,  # fewnerd
+      0.10,  # wikiner
+      0.10,  # gretel_pii
+      0.10,  # ai4privacy
+      0.10,  # mendeley_pii
+      # 0.05   # bigcode_pii (if enabled)
+    ]
+    
+    # Mixing strategy
+    mixing_strategy: "interleave"  # Options: concat, interleave, weighted
+    
+    # Filter non-English data
+    filter_english: true
+    
+    # Memory management - limit samples per dataset
+    max_samples_per_dataset: 50000
+    
+    # BigCode authentication (uncomment if using bigcode_pii)
+    # bigcode_config:
+    #   dataset_name: "bigcode/the-stack-pii"
+    #   use_auth_token: "YOUR_HF_TOKEN"
+
+training:
+  output_dir: "./mistral-ner-multidataset-extended"
+  final_output_dir: "./mistral-ner-multidataset-extended-final"
+  num_train_epochs: 5
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  optim: "paged_adamw_32bit"
+  learning_rate: 2e-4
+  weight_decay: 0.001
+  warmup_ratio: 0.03
+  max_grad_norm: 1.0
+  
+  # Evaluation and saving
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  logging_steps: 10
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1"
+  greater_is_better: true
+  report_to: ["wandb"]
+  
+  # Mixed precision
+  fp16: false
+  bf16: false
+  tf32: true
+  
+  # Early stopping
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.01
+  
+  # Memory management
+  clear_cache_steps: 50
+  
+  # Seed
+  seed: 42
+  data_seed: 42
+
+logging:
+  log_level: "info"
+  log_dir: "./logs"
+  disable_tqdm: false
+  
+  # WandB configuration
+  use_wandb: true
+  wandb_project: "mistral-ner-multidataset-extended"
+  wandb_tags: ["multi-dataset", "pii", "financial", "extended"]
+  wandb_mode: "online"
+  wandb_dir: "./wandb"

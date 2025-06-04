@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 import wandb
-from datasets import Dataset
 from transformers import (
     EarlyStoppingCallback,
     PreTrainedModel,
@@ -22,6 +21,8 @@ from transformers import (
     TrainingArguments,
 )
 from transformers.integrations import WandbCallback
+
+from datasets import Dataset
 
 from .evaluation import compute_metrics_factory, load_seqeval_metric
 from .losses import compute_class_frequencies, create_loss_function

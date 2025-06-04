@@ -288,12 +288,10 @@ class PytestRunner(BaseRunner):
             "uv",
             "run",
             "pytest",
-
             # Explicitly specify all coverage targets to ensure consistent behavior
             "--cov=src",
             "--cov=api",
             "--cov=scripts",
-
             # Note: --cov-report=term-missing already in pyproject.toml
             "--cov-report=json:coverage.json",
             "--cov-report=xml:coverage.xml",
