@@ -9,9 +9,9 @@ import pytest
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from datasets import Dataset, DatasetDict
 from transformers import AutoTokenizer
 
+from datasets import Dataset, DatasetDict
 from src.config import Config
 from src.data import (
     create_data_collator,
