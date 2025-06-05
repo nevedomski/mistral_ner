@@ -28,9 +28,14 @@ class CoNLLDataset(BaseNERDataset):
         try:
             dataset = load_dataset("conll2003")
             logger.info(f"Dataset loaded successfully. Keys: {dataset.keys()}")
-            logger.info(f"Train size: {len(dataset['train'])}")
-            logger.info(f"Validation size: {len(dataset['validation'])}")
-            logger.info(f"Test size: {len(dataset['test'])}")
+
+            # Log sizes only for splits that exist
+            if "train" in dataset:
+                logger.info(f"Train size: {len(dataset['train'])}")
+            if "validation" in dataset:
+                logger.info(f"Validation size: {len(dataset['validation'])}")
+            if "test" in dataset:
+                logger.info(f"Test size: {len(dataset['test'])}")
 
             self.validate_dataset(dataset)
             return dataset
