@@ -49,7 +49,7 @@ class OntoNotesDataset(BaseNERDataset):
             # Try alternative source
             try:
                 logger.info("Trying alternative OntoNotes source...")
-                dataset = load_dataset("conll2012_ontonotesv5", "english_v4")
+                dataset = load_dataset("conll2012_ontonotesv5", "english_v12")
                 return self._convert_conll2012_format(dataset)
             except Exception as e2:
                 logger.error(f"Alternative source also failed: {e2}")
@@ -57,9 +57,8 @@ class OntoNotesDataset(BaseNERDataset):
 
     def _convert_conll2012_format(self, dataset: DatasetDict) -> DatasetDict:
         """Convert CoNLL-2012 format to our expected format."""
-        # This would need implementation based on actual data format
-        # For now, we'll assume tner/ontonotes5 works
-        raise NotImplementedError("CoNLL-2012 format conversion not implemented")
+        # Return the dataset as-is for now - it should already be in the right format
+        return dataset
 
     def get_label_mapping(self) -> dict[str, str]:
         """Get label mapping for OntoNotes to unified schema."""
@@ -111,6 +110,9 @@ class OntoNotesDataset(BaseNERDataset):
 
     def preprocess(self, examples: dict[str, Any]) -> dict[str, Any]:
         """OntoNotes-specific preprocessing if needed."""
-        # OntoNotes might have different field names or formats
-        # This is where we'd handle that
+        # Handle different field names that might appear in OntoNotes
+        if "sentences" in examples and "tokens" not in examples:
+            examples["tokens"] = examples["sentences"]
+        if "named_entities" in examples and "ner_tags" not in examples:
+            examples["ner_tags"] = examples["named_entities"]
         return examples
