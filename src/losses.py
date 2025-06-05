@@ -119,6 +119,41 @@ class FocalLoss(nn.Module):
             return focal_loss
 
 
+class WeightedFocalLoss(FocalLoss):
+    """
+    Weighted Focal Loss that combines class weighting with focal loss.
+    This is specifically designed for severe class imbalance in NER.
+    """
+
+    def __init__(
+        self,
+        num_labels: int,
+        class_weights: list[float] | None = None,
+        gamma: float = 2.0,
+        ignore_index: int = -100,
+        reduction: str = "mean",
+    ) -> None:
+        """
+        Initialize Weighted Focal Loss.
+
+        Args:
+            num_labels: Number of classes
+            class_weights: Class weights for handling imbalance
+            gamma: Focusing parameter
+            ignore_index: Index to ignore in loss computation
+            reduction: Reduction method
+        """
+        # Convert class weights to alpha for focal loss
+        super().__init__(
+            num_labels=num_labels,
+            alpha=class_weights,
+            gamma=gamma,
+            ignore_index=ignore_index,
+            reduction=reduction,
+        )
+        logger.info("Initialized Weighted Focal Loss for severe class imbalance handling")
+
+
 class LabelSmoothingLoss(nn.Module):
     """
     Label Smoothing Loss for token classification.
@@ -191,6 +226,117 @@ class LabelSmoothingLoss(nn.Module):
         return loss.mean()
 
 
+class BatchBalancedFocalLoss(nn.Module):
+    """
+    Batch-Balanced Focal Loss for extreme class imbalance.
+
+    This loss dynamically adjusts class weights based on the batch composition,
+    ensuring better gradient flow for rare classes even in imbalanced batches.
+    """
+
+    def __init__(
+        self,
+        num_labels: int,
+        gamma: float = 2.0,
+        base_alpha: float | list[float] | None = None,
+        batch_balance_beta: float = 0.999,
+        ignore_index: int = -100,
+        reduction: str = "mean",
+    ) -> None:
+        """
+        Initialize Batch-Balanced Focal Loss.
+
+        Args:
+            num_labels: Number of classes
+            gamma: Focal loss focusing parameter
+            base_alpha: Base class weights (can be updated per batch)
+            batch_balance_beta: Re-weighting factor for batch balancing
+            ignore_index: Index to ignore in loss
+            reduction: Reduction method
+        """
+        super().__init__()
+        self.num_labels = num_labels
+        self.gamma = gamma
+        self.batch_balance_beta = batch_balance_beta
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+
+        # Initialize base focal loss
+        self.focal_loss = FocalLoss(
+            num_labels=num_labels,
+            alpha=base_alpha,
+            gamma=gamma,
+            ignore_index=ignore_index,
+            reduction="none",  # We'll handle reduction after re-weighting
+        )
+
+        logger.info(f"Initialized Batch-Balanced Focal Loss with gamma={gamma}, beta={batch_balance_beta}")
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass with dynamic batch-based re-weighting.
+
+        Args:
+            inputs: Logits [batch_size, seq_len, num_labels]
+            targets: Target labels [batch_size, seq_len]
+
+        Returns:
+            Batch-balanced focal loss value
+        """
+        # Get per-sample focal loss
+        focal_losses = self.focal_loss(inputs, targets)
+
+        # Compute batch statistics for re-weighting
+        valid_mask = targets != self.ignore_index
+
+        if not valid_mask.any():
+            return torch.tensor(0.0, device=inputs.device, requires_grad=True)
+
+        # Flatten for easier computation
+        targets_valid = targets[valid_mask]
+
+        # Handle case where focal_losses is already reduced
+        if focal_losses.dim() == 0:
+            # If already reduced to scalar, re-compute without reduction
+            focal_losses = self.focal_loss.forward(inputs, targets)
+
+        # Flatten focal losses
+        if focal_losses.dim() > 1:
+            focal_losses = focal_losses.view(-1)
+
+        focal_losses_valid = focal_losses[valid_mask.view(-1)]
+
+        # Compute batch class frequencies
+        batch_class_counts = torch.zeros(self.num_labels, device=targets.device)
+        for i in range(self.num_labels):
+            batch_class_counts[i] = (targets_valid == i).sum().float()
+
+        # Compute effective numbers for batch
+        batch_effective_num = 1.0 - torch.pow(self.batch_balance_beta, batch_class_counts)
+        batch_weights = (1.0 - self.batch_balance_beta) / (batch_effective_num + 1e-8)
+
+        # Normalize weights
+        batch_weights = batch_weights / batch_weights.sum() * self.num_labels
+
+        # Apply batch-based re-weighting
+        if focal_losses_valid.dim() == 0:
+            # Single element
+            weight = batch_weights[targets_valid.item()]
+            balanced_loss = focal_losses_valid * weight
+        else:
+            # Multiple elements
+            sample_weights = batch_weights[targets_valid]
+            balanced_loss = focal_losses_valid * sample_weights
+
+        # Apply reduction
+        if self.reduction == "mean":
+            return balanced_loss.mean()
+        elif self.reduction == "sum":
+            return balanced_loss.sum()
+        else:
+            return balanced_loss
+
+
 class ClassBalancedLoss(nn.Module):
     """
     Class-Balanced Loss based on effective number of samples.
@@ -250,6 +396,51 @@ class ClassBalancedLoss(nn.Module):
         return self.base_loss(inputs, targets)
 
 
+def calculate_class_weights(
+    class_frequencies: list[int],
+    weight_type: str = "inverse",
+    smoothing: float = 1.0,
+) -> list[float]:
+    """
+    Calculate class weights from frequencies to handle imbalance.
+
+    Args:
+        class_frequencies: List of sample counts per class
+        weight_type: Type of weighting ('inverse', 'inverse_sqrt', 'effective')
+        smoothing: Smoothing factor to prevent extreme weights
+
+    Returns:
+        List of weights per class
+    """
+    import numpy as np
+
+    frequencies = np.array(class_frequencies, dtype=np.float32)
+
+    # Add smoothing to prevent division by zero
+    frequencies = frequencies + smoothing
+
+    if weight_type == "inverse":
+        # Inverse frequency weighting
+        weights = 1.0 / frequencies
+    elif weight_type == "inverse_sqrt":
+        # Inverse square root (less aggressive)
+        weights = 1.0 / np.sqrt(frequencies)
+    elif weight_type == "effective":
+        # Effective number based weighting (similar to class-balanced loss)
+        beta = 0.9999
+        effective_num = 1.0 - np.power(beta, frequencies)
+        weights = (1.0 - beta) / effective_num
+    else:
+        raise ValueError(f"Unknown weight_type: {weight_type}")
+
+    # Normalize weights to sum to number of classes
+    weights = weights / weights.sum() * len(weights)
+
+    weights_list: list[float] = weights.tolist()
+    logger.info(f"Calculated class weights ({weight_type}): {weights_list}")
+    return weights_list
+
+
 def compute_class_frequencies(dataset: Any, label_column: str = "labels") -> list[int]:
     """
     Compute class frequencies from a dataset.
@@ -290,21 +481,35 @@ def create_loss_function(
     loss_type: str,
     num_labels: int,
     class_frequencies: list[int] | None = None,
+    class_weights: list[float] | None = None,
+    auto_weight: bool = False,
+    weight_type: str = "inverse",
+    smoothing: float = 1.0,
     **kwargs: Any,
 ) -> nn.Module:
     """
     Factory function to create loss functions.
 
     Args:
-        loss_type: Type of loss ('focal', 'label_smoothing', 'class_balanced', 'cross_entropy')
+        loss_type: Type of loss ('focal', 'label_smoothing', 'class_balanced', 'cross_entropy', 'weighted_cross_entropy')
         num_labels: Number of classes
-        class_frequencies: Class frequencies for class-balanced loss
+        class_frequencies: Class frequencies for auto-weight calculation
+        class_weights: Manual class weights (overrides auto_weight)
+        auto_weight: Automatically calculate class weights from frequencies
         **kwargs: Additional arguments for specific loss functions
 
     Returns:
         Configured loss function
     """
+    # Calculate class weights if requested
+    if auto_weight and class_weights is None and class_frequencies is not None:
+        class_weights = calculate_class_weights(class_frequencies, weight_type=weight_type, smoothing=smoothing)
+        logger.info(f"Auto-calculated class weights: {class_weights}")
+
     if loss_type == "focal":
+        # For focal loss, weights are passed as alpha parameter
+        if class_weights is not None and "alpha" not in kwargs:
+            kwargs["alpha"] = class_weights
         return FocalLoss(num_labels=num_labels, **kwargs)
     elif loss_type == "label_smoothing":
         return LabelSmoothingLoss(num_labels=num_labels, **kwargs)
@@ -312,7 +517,13 @@ def create_loss_function(
         if class_frequencies is None:
             raise ValueError("class_frequencies required for class_balanced loss")
         return ClassBalancedLoss(num_labels=num_labels, class_frequencies=class_frequencies, **kwargs)
-    elif loss_type == "cross_entropy":
+    elif loss_type == "cross_entropy" or loss_type == "weighted_cross_entropy":
+        if class_weights is not None:
+            weight_tensor = torch.tensor(class_weights, dtype=torch.float32)
+            return nn.CrossEntropyLoss(weight=weight_tensor, **kwargs)
         return nn.CrossEntropyLoss(**kwargs)
+    elif loss_type == "batch_balanced_focal":
+        # For batch-balanced focal loss
+        return BatchBalancedFocalLoss(num_labels=num_labels, base_alpha=class_weights, **kwargs)
     else:
         raise ValueError(f"Unsupported loss_type: {loss_type}")

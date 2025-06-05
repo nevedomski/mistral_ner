@@ -164,7 +164,16 @@ class TrainingManager:
 
         # Create compute metrics function if not provided
         if compute_metrics is None:
-            compute_metrics = compute_metrics_factory(self.config.data.label_names, self.seqeval_metric)
+            if self.config.training.use_enhanced_evaluation:
+                from .evaluation import create_enhanced_compute_metrics
+
+                compute_metrics = create_enhanced_compute_metrics(
+                    self.config.data.label_names,
+                    self.seqeval_metric,
+                    compute_detailed=self.config.training.compute_entity_level_metrics,
+                )
+            else:
+                compute_metrics = compute_metrics_factory(self.config.data.label_names, self.seqeval_metric)
 
         # Create callbacks
         callbacks = [
@@ -257,13 +266,17 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
 
     # Setup custom loss function if not using standard cross-entropy
     custom_loss_fn = None
-    if config.training.loss_type != "cross_entropy":
+    if config.training.loss_type != "cross_entropy" or config.training.use_class_weights:
         logger.info(f"Setting up custom loss function: {config.training.loss_type}")
+        if config.training.use_class_weights:
+            logger.info("Class weighting enabled")
 
         # Compute class frequencies if needed
         class_frequencies = None
-        if config.training.loss_type in ["class_balanced"] or (
-            config.training.loss_type == "focal" and config.training.focal_alpha is None
+        if (
+            config.training.loss_type in ["class_balanced"]
+            or (config.training.loss_type == "focal" and config.training.focal_alpha is None)
+            or config.training.use_class_weights
         ):
             if train_dataset is not None:
                 class_frequencies = compute_class_frequencies(train_dataset, "labels")
@@ -286,6 +299,13 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
                 num_labels=config.model.num_labels,
                 gamma=config.training.focal_gamma,
                 alpha=focal_alpha,
+                class_frequencies=class_frequencies,
+                class_weights=config.training.manual_class_weights if config.training.use_class_weights else None,
+                auto_weight=config.training.use_class_weights
+                and config.training.manual_class_weights is None
+                and focal_alpha is None,
+                weight_type=config.training.class_weight_type,
+                smoothing=config.training.class_weight_smoothing,
             )
         elif config.training.loss_type == "label_smoothing":
             custom_loss_fn = create_loss_function(
@@ -302,6 +322,19 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
                 class_frequencies=class_frequencies,
                 beta=config.training.class_balanced_beta,
             )
+        elif config.training.loss_type == "weighted_cross_entropy" or (
+            config.training.loss_type == "cross_entropy" and config.training.use_class_weights
+        ):
+            # Handle weighted cross-entropy
+            custom_loss_fn = create_loss_function(
+                loss_type="weighted_cross_entropy",
+                num_labels=config.model.num_labels,
+                class_frequencies=class_frequencies,
+                class_weights=config.training.manual_class_weights,
+                auto_weight=config.training.use_class_weights and config.training.manual_class_weights is None,
+                weight_type=config.training.class_weight_type,
+                smoothing=config.training.class_weight_smoothing,
+            )
         else:
             custom_loss_fn = create_loss_function(
                 loss_type=config.training.loss_type,
@@ -310,6 +343,46 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
 
     class CustomTrainer(Trainer):
         """Custom trainer with enhanced error handling, logging, and focal loss support."""
+
+        def get_train_dataloader(self) -> torch.utils.data.DataLoader:
+            """Override to use custom batch sampler if enabled."""
+            if config.training.use_batch_balancing and train_dataset is not None:
+                from torch.utils.data import DataLoader
+
+                from .batch_balancing import BalancedBatchSampler, BatchCompositionLogger, EntityAwareBatchSampler
+
+                # Create appropriate sampler
+                if config.training.batch_balance_type == "balanced":
+                    batch_sampler = BalancedBatchSampler(
+                        dataset=train_dataset,
+                        batch_size=self.args.per_device_train_batch_size,
+                        min_positive_ratio=config.training.min_positive_ratio,
+                        seed=self.args.seed,
+                    )
+                elif config.training.batch_balance_type == "entity_aware":
+                    batch_sampler = EntityAwareBatchSampler(
+                        dataset=train_dataset,
+                        batch_size=self.args.per_device_train_batch_size,
+                        seed=self.args.seed,
+                    )
+                else:
+                    raise ValueError(f"Unknown batch_balance_type: {config.training.batch_balance_type}")
+
+                # Initialize batch composition logger if enabled
+                if config.training.log_batch_composition:
+                    self.batch_logger = BatchCompositionLogger(log_every_n_batches=config.training.log_batch_every_n)
+
+                # Create dataloader with custom batch sampler
+                return DataLoader(
+                    train_dataset,
+                    batch_sampler=batch_sampler,
+                    collate_fn=self.data_collator,
+                    pin_memory=self.args.dataloader_pin_memory,
+                    num_workers=self.args.dataloader_num_workers,
+                )
+            else:
+                # Use default dataloader
+                return super().get_train_dataloader()
 
         def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None) -> Any:
             """Create custom learning rate scheduler."""
@@ -335,6 +408,12 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
         ) -> torch.Tensor | tuple[torch.Tensor, Any]:
             """Override compute_loss to use custom loss functions."""
             try:
+                # Log batch composition if enabled
+                if config.training.log_batch_composition and hasattr(self, "batch_logger"):
+                    labels = inputs.get("labels")
+                    if labels is not None:
+                        self.batch_logger.log_batch(labels)
+
                 if custom_loss_fn is not None:
                     # Use custom loss function
                     labels = inputs.get("labels")

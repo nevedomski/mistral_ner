@@ -197,6 +197,188 @@ def evaluate_model(
     return metrics
 
 
+def compute_detailed_metrics(
+    true_labels: list[list[str]],
+    pred_labels: list[list[str]],
+    label_names: list[str],
+) -> dict[str, Any]:
+    """
+    Compute detailed per-entity metrics and error analysis.
+
+    Args:
+        true_labels: True label sequences
+        pred_labels: Predicted label sequences
+        label_names: List of all possible labels
+
+    Returns:
+        Dictionary with detailed metrics and analysis
+    """
+    from collections import defaultdict
+
+    from seqeval.metrics import classification_report
+
+    # Get standard classification report
+    report = classification_report(true_labels, pred_labels, output_dict=True, zero_division=0)
+
+    # Initialize detailed metrics
+    detailed_metrics = {
+        "overall": {
+            "precision": report.get("macro avg", {}).get("precision", 0),
+            "recall": report.get("macro avg", {}).get("recall", 0),
+            "f1": report.get("macro avg", {}).get("f1-score", 0),
+            "support": report.get("macro avg", {}).get("support", 0),
+        },
+        "per_entity_type": {},
+        "confusion_matrix": defaultdict(lambda: defaultdict(int)),
+        "error_analysis": {
+            "false_positives": defaultdict(list),
+            "false_negatives": defaultdict(list),
+            "boundary_errors": defaultdict(int),
+            "type_confusion": defaultdict(lambda: defaultdict(int)),
+        },
+    }
+
+    # Group entities by type (PER, ORG, LOC, MISC, etc.)
+    entity_types = defaultdict(list)
+    for label in label_names:
+        if label != "O" and "-" in label:
+            entity_type = label.split("-")[1]
+            entity_types[entity_type].append(label)
+
+    # Compute per-entity-type metrics
+    for entity_type, type_labels in entity_types.items():
+        type_metrics = {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 0,
+            "b_tag_accuracy": 0.0,
+            "i_tag_accuracy": 0.0,
+        }
+
+        # Aggregate metrics for this entity type
+        total_support = 0
+        weighted_precision = 0.0
+        weighted_recall = 0.0
+        weighted_f1 = 0.0
+
+        for label in type_labels:
+            if label in report:
+                label_metrics = report[label]
+                support = label_metrics.get("support", 0)
+                total_support += support
+
+                weighted_precision += label_metrics.get("precision", 0) * support
+                weighted_recall += label_metrics.get("recall", 0) * support
+                weighted_f1 += label_metrics.get("f1-score", 0) * support
+
+                # Track B vs I tag accuracy
+                if label.startswith("B-"):
+                    type_metrics["b_tag_accuracy"] = label_metrics.get("f1-score", 0)
+                elif label.startswith("I-"):
+                    type_metrics["i_tag_accuracy"] = label_metrics.get("f1-score", 0)
+
+        if total_support > 0:
+            type_metrics["precision"] = weighted_precision / total_support
+            type_metrics["recall"] = weighted_recall / total_support
+            type_metrics["f1"] = weighted_f1 / total_support
+            type_metrics["support"] = total_support
+
+        detailed_metrics["per_entity_type"][entity_type] = type_metrics
+
+    # Error analysis
+    for true_seq, pred_seq in zip(true_labels, pred_labels, strict=False):
+        for i, (true_label, pred_label) in enumerate(zip(true_seq, pred_seq, strict=False)):
+            if true_label != pred_label:
+                # Update confusion matrix
+                detailed_metrics["confusion_matrix"][true_label][pred_label] += 1
+
+                # Analyze error types
+                if true_label == "O" and pred_label != "O":
+                    # False positive
+                    detailed_metrics["error_analysis"]["false_positives"][pred_label].append(i)
+                elif true_label != "O" and pred_label == "O":
+                    # False negative
+                    detailed_metrics["error_analysis"]["false_negatives"][true_label].append(i)
+                elif true_label != "O" and pred_label != "O":
+                    # Type confusion or boundary error
+                    true_bio, true_type = true_label.split("-") if "-" in true_label else ("O", "O")
+                    pred_bio, pred_type = pred_label.split("-") if "-" in pred_label else ("O", "O")
+
+                    if true_type != pred_type:
+                        # Type confusion (e.g., PER predicted as ORG)
+                        detailed_metrics["error_analysis"]["type_confusion"][true_type][pred_type] += 1
+                    else:
+                        # Boundary error (B/I mismatch)
+                        detailed_metrics["error_analysis"]["boundary_errors"][true_type] += 1
+
+    return detailed_metrics
+
+
+def create_enhanced_compute_metrics(
+    label_names: list[str],
+    seqeval_metric: EvaluationModule | None = None,
+    compute_detailed: bool = True,
+) -> Callable[[EvalPrediction], dict[str, float]]:
+    """
+    Create enhanced compute_metrics function with detailed per-entity analysis.
+
+    Args:
+        label_names: List of label names
+        seqeval_metric: Pre-loaded seqeval metric
+        compute_detailed: Whether to compute detailed metrics
+
+    Returns:
+        Enhanced compute_metrics function
+    """
+    base_compute_metrics = compute_metrics_factory(label_names, seqeval_metric)
+
+    def enhanced_compute_metrics(p: EvalPrediction) -> dict[str, float]:
+        """Compute enhanced NER metrics with detailed analysis."""
+        # Get base metrics
+        metrics = base_compute_metrics(p)
+
+        if compute_detailed:
+            # Get aligned labels for detailed analysis
+            predictions, labels = p
+            true_labels, pred_labels = align_predictions(predictions, labels, label_names)
+
+            # Compute detailed metrics
+            detailed = compute_detailed_metrics(true_labels, pred_labels, label_names)
+
+            # Add per-entity-type metrics to results
+            for entity_type, type_metrics in detailed["per_entity_type"].items():
+                metrics[f"{entity_type}_precision"] = type_metrics["precision"]
+                metrics[f"{entity_type}_recall"] = type_metrics["recall"]
+                metrics[f"{entity_type}_f1"] = type_metrics["f1"]
+                metrics[f"{entity_type}_support"] = type_metrics["support"]
+
+                # Add B/I tag accuracy if available
+                if type_metrics["b_tag_accuracy"] > 0:
+                    metrics[f"{entity_type}_b_accuracy"] = type_metrics["b_tag_accuracy"]
+                if type_metrics["i_tag_accuracy"] > 0:
+                    metrics[f"{entity_type}_i_accuracy"] = type_metrics["i_tag_accuracy"]
+
+            # Add error analysis summary
+            total_errors = sum(sum(conf.values()) for conf in detailed["confusion_matrix"].values())
+            if total_errors > 0:
+                metrics["error_rate"] = total_errors / sum(len(seq) for seq in true_labels)
+
+                # Add type confusion rate
+                total_type_confusion = sum(
+                    sum(confusion.values()) for confusion in detailed["error_analysis"]["type_confusion"].values()
+                )
+                metrics["type_confusion_rate"] = total_type_confusion / total_errors
+
+                # Add boundary error rate
+                total_boundary_errors = sum(detailed["error_analysis"]["boundary_errors"].values())
+                metrics["boundary_error_rate"] = total_boundary_errors / total_errors
+
+        return metrics
+
+    return enhanced_compute_metrics
+
+
 def print_evaluation_report(predictions: list[list[str]], labels: list[list[str]], label_names: list[str]) -> None:
     """Print detailed evaluation report."""
     report = classification_report(labels, predictions, digits=4, zero_division=0)
