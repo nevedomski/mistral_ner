@@ -29,8 +29,9 @@ class TestUnifiedLabelSchema:
         assert "B-SSN" in labels
         assert "I-SSN" in labels
 
-        # Should be sorted
-        assert labels == sorted(labels)
+        # Should start with O, then be sorted
+        assert labels[0] == "O"
+        assert labels[1:] == sorted(labels[1:])
 
 
 class TestLabelMapper:
@@ -76,29 +77,17 @@ class TestLabelMapper:
         """Test mapping labels with integer inputs."""
         mapper = LabelMapper(["O", "B-PER", "I-PER"])
 
-        # Mock examples with features
-        examples = {"ner_tags": [[1, 2, 0], [0, 1, 2]]}
-
-        # Mock the feature names
+        # Create examples object with proper feature metadata
         class MockFeature:
             names: ClassVar[list[str]] = ["O", "B-PER", "I-PER"]
 
-        class MockField:
+        class MockFeatures:
             feature = MockFeature()
 
-        examples["ner_tags"] = MockField()
-        examples["ner_tags"] = [[1, 2, 0], [0, 1, 2]]  # Override with actual data
-
-        # Create a custom examples object that has the feature attribute
         class MockExamples(dict):
             def __init__(self, data):
                 super().__init__(data)
-                self._ner_tags_field = MockField()
-
-            def get(self, key):
-                if key == "ner_tags":
-                    return self._ner_tags_field
-                return super().get(key)
+                self.features = {"ner_tags": MockFeatures()}
 
         mock_examples = MockExamples({"ner_tags": [[1, 2, 0], [0, 1, 2]]})
 

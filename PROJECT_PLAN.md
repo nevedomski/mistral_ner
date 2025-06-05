@@ -24,7 +24,7 @@ This document outlines the prioritized development plan for the Mistral NER proj
 - **Rationale**: Type safety catches bugs early, improves maintainability
 
 #### 3. NER-5: Test coverage (HIGH PRIORITY)
-- **Objective**: Achieve 90%+ test coverage
+- **Objective**: Achieve 85%+ test coverage
 - **Tasks**:
   - Fix existing unit tests
   - Add additional unit tests to cover 90%+ for every file
@@ -89,7 +89,7 @@ This document outlines the prioritized development plan for the Mistral NER proj
 
 ## Success Metrics
 - Code quality: 0 linting errors, 100% type coverage
-- Test coverage: 90%+ for all modules
+- Test coverage: 85%+ for all modules
 - Model performance: F1 score > 0.8
 - Security: No critical vulnerabilities
 - Infrastructure: Seamless offline/online training

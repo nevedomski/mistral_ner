@@ -281,5 +281,102 @@ def test_print_dataset_statistics_without_tokenizer(capsys):
     assert "Number of examples:" in captured.out
 
 
+def test_validate_dataset_label_mismatch_warning(caplog):
+    """Test dataset validation warns on label mismatch."""
+    from datasets import ClassLabel, Features, Sequence, Value
+
+    # Create dataset with different label names
+    different_labels = ["O", "B-PERSON", "I-PERSON", "B-ORGANIZATION", "I-ORGANIZATION"]
+    expected_labels = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
+
+    features = Features(
+        {
+            "tokens": Sequence(feature=Value(dtype="string")),
+            "ner_tags": Sequence(feature=ClassLabel(names=different_labels)),
+        }
+    )
+
+    data = [{"tokens": ["test"], "ner_tags": [0]}]
+    dataset = DatasetDict(
+        {
+            "train": Dataset.from_list(data, features=features),
+            "validation": Dataset.from_list(data, features=features),
+            "test": Dataset.from_list(data, features=features),
+        }
+    )
+
+    # Should log a warning about label mismatch
+    validate_dataset(dataset, expected_labels)
+
+    assert "Label mismatch" in caplog.text
+    assert "Expected:" in caplog.text
+    assert "Got:" in caplog.text
+
+
+def test_tokenize_and_align_labels_edge_cases():
+    """Test tokenization edge cases with label_all_tokens."""
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+    # Test with label_all_tokens=True and subword tokens
+    examples = {
+        "tokens": [["playing"]],  # This will likely split into subwords
+        "ner_tags": [[1]],  # B-PER
+    }
+
+    result = tokenize_and_align_labels(examples=examples, tokenizer=tokenizer, max_length=128, label_all_tokens=True)
+
+    # The word "playing" should be split and all subwords should get the label
+    labels = result["labels"][0]
+    # Count non-special token labels
+    valid_labels = [label for label in labels if label != -100]
+    assert all(label == 1 for label in valid_labels)  # All subwords get the same label
+
+
+def test_print_dataset_statistics_with_entity_labels(capsys):
+    """Test dataset statistics printing with proper entity label names."""
+    from datasets import ClassLabel, Features, Sequence, Value
+
+    # Create dataset with proper label features
+    label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
+
+    data = [
+        {
+            "tokens": ["John", "Smith", "works", "at", "Microsoft", "in", "Seattle"],
+            "ner_tags": [1, 2, 0, 0, 3, 0, 5],
+        },  # B-PER, I-PER, O, O, B-ORG, O, B-LOC
+        {
+            "tokens": ["Apple", "Inc", "is", "based", "in", "Cupertino"],
+            "ner_tags": [3, 4, 0, 0, 0, 5],
+        },  # B-ORG, I-ORG, O, O, O, B-LOC
+    ]
+
+    features = Features(
+        {
+            "tokens": Sequence(feature=Value(dtype="string")),
+            "ner_tags": Sequence(feature=ClassLabel(names=label_names)),
+        }
+    )
+
+    dataset = DatasetDict(
+        {
+            "train": Dataset.from_list(data, features=features),
+            "validation": Dataset.from_list(data[:1], features=features),
+            "test": Dataset.from_list(data[1:], features=features),
+        }
+    )
+
+    print_dataset_statistics(dataset)
+
+    captured = capsys.readouterr()
+
+    # Check that entity labels are printed with their names
+    assert "B-PER: 1" in captured.out
+    assert "I-PER: 1" in captured.out
+    assert "B-ORG: 2" in captured.out
+    assert "I-ORG: 1" in captured.out
+    assert "B-LOC: 2" in captured.out
+    assert "O:" in captured.out
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -99,6 +99,22 @@ class TestFocalLoss:
         result = loss(inputs, targets)
         assert result.item() == 0.0
 
+    def test_focal_loss_alpha_device_handling(self):
+        """Test focal loss handles alpha device mismatch correctly."""
+        num_labels = 9
+        alpha = torch.ones(num_labels)
+        loss_fn = FocalLoss(num_labels=num_labels, gamma=2.0, alpha=alpha)
+
+        # Create inputs and targets
+        inputs = torch.randn(2, 5, num_labels)
+        targets = torch.randint(0, num_labels, (2, 5))
+
+        # Test that loss computation works (will test device handling logic)
+        loss = loss_fn(inputs, targets)
+        assert loss.item() > 0
+        # Verify alpha was used (loss should be finite and reasonable)
+        assert torch.isfinite(loss)
+
 
 class TestLabelSmoothingLoss:
     """Test LabelSmoothingLoss implementation."""

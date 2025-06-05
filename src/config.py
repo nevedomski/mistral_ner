@@ -312,7 +312,11 @@ class Config:
     def to_yaml(self, yaml_path: str | Path) -> None:
         """Save configuration to YAML file."""
         # Create clean dictionaries without computed fields
-        data_dict = {k: v for k, v in self.data.__dict__.items() if k not in ["id2label", "label2id"]}
+        data_dict = {k: v for k, v in self.data.__dict__.items() if k not in ["id2label", "label2id", "label_names"]}
+
+        # Convert multi_dataset to dict if it exists
+        if "multi_dataset" in data_dict and data_dict["multi_dataset"] is not None:
+            data_dict["multi_dataset"] = data_dict["multi_dataset"].__dict__
 
         config_dict: dict[str, dict[str, Any]] = {
             "model": self.model.__dict__,

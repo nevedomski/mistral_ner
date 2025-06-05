@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns  # type: ignore[import-untyped]
 import wandb
@@ -250,7 +250,7 @@ def create_performance_summary_plot(
         "Accuracy": metrics.get("accuracy", 0),
     }
 
-    bars = ax1.bar(overall_metrics.keys(), overall_metrics.values())
+    bars = ax1.bar(list(overall_metrics.keys()), list(overall_metrics.values()))
     ax1.set_ylim(0, 1.0)
     ax1.set_title("Overall Performance Metrics")
     ax1.set_ylabel("Score")
@@ -293,7 +293,7 @@ def create_performance_summary_plot(
     }
 
     if any(v > 0 for v in error_metrics.values()):
-        bars = ax3.bar(error_metrics.keys(), error_metrics.values())
+        bars = ax3.bar(list(error_metrics.keys()), list(error_metrics.values()))
         ax3.set_title("Error Analysis")
         ax3.set_ylabel("Rate")
 
