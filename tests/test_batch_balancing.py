@@ -235,3 +235,28 @@ class TestBatchBalancing:
         assert stats["total_tokens"] == 1
         assert stats["entity_tokens"] == 1
         assert stats["entity_ratio"] == 1.0
+
+    def test_balanced_batch_sampler_insufficient_positive_samples(self):
+        """Test sampler when there are very few positive samples to trigger break statement."""
+        # Create dataset with only 2 positive samples
+        data = {
+            "labels": [[0, 0, 0]] * 50 + [[0, 1, 0], [0, 1, 2]]  # Only 2 have positive labels
+        }
+        dataset = Dataset.from_dict(data)
+
+        # Use a sampler that wants many positive samples per batch
+        sampler = BalancedBatchSampler(
+            dataset=dataset,
+            batch_size=8,
+            min_positive_ratio=0.75,  # Wants 6 positive samples per batch
+            seed=42,
+        )
+
+        batches = list(sampler)
+
+        # Should still create batches even with insufficient positive samples
+        assert len(batches) > 0
+        # First batch should contain all available positive samples (indices 50, 51)
+        first_batch = batches[0]
+        positive_in_first = [idx for idx in first_batch if idx >= 50]
+        assert len(positive_in_first) == 2  # All positive samples used

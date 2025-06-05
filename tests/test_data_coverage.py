@@ -94,7 +94,7 @@ class TestDataFunctions:
                         "tokens": [["M"]],
                         "ner_tags": [[0]],
                     }
-                )
+                ),
             }
         )
         mock_load_conll2003.return_value = mock_dataset
@@ -114,10 +114,12 @@ class TestDataFunctions:
         # Mock the tokenizer to return our custom object
         def mock_tokenize(tokens, **kwargs):
             # Return proper tokenized output for each example
-            return MockBatchEncoding({
-                "input_ids": [[101, 100, 102]] * len(tokens),  # Simple mock tokens
-                "attention_mask": [[1, 1, 1]] * len(tokens)
-            })
+            return MockBatchEncoding(
+                {
+                    "input_ids": [[101, 100, 102]] * len(tokens),  # Simple mock tokens
+                    "attention_mask": [[1, 1, 1]] * len(tokens),
+                }
+            )
 
         mock_tokenizer.side_effect = mock_tokenize
 
@@ -132,8 +134,8 @@ class TestDataFunctions:
 
         # When all splits exist, they are tokenized as-is
         assert len(train_dataset) == 10  # All train examples
-        assert len(eval_dataset) == 2   # All validation examples
-        assert len(test_dataset) == 1   # All test examples
+        assert len(eval_dataset) == 2  # All validation examples
+        assert len(test_dataset) == 1  # All test examples
 
     @patch("src.data.print")
     def test_print_dataset_statistics_no_tokenizer(self, mock_print):

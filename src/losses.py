@@ -484,7 +484,7 @@ def create_loss_function(
     class_weights: list[float] | None = None,
     auto_weight: bool = False,
     weight_type: str = "inverse",
-    smoothing: float = 1.0,
+    class_weight_smoothing: float = 1.0,
     **kwargs: Any,
 ) -> nn.Module:
     """
@@ -496,14 +496,18 @@ def create_loss_function(
         class_frequencies: Class frequencies for auto-weight calculation
         class_weights: Manual class weights (overrides auto_weight)
         auto_weight: Automatically calculate class weights from frequencies
-        **kwargs: Additional arguments for specific loss functions
+        weight_type: Type of weighting for class weights
+        class_weight_smoothing: Smoothing factor for class weight calculation
+        **kwargs: Additional arguments for specific loss functions (e.g., smoothing for label_smoothing)
 
     Returns:
         Configured loss function
     """
     # Calculate class weights if requested
     if auto_weight and class_weights is None and class_frequencies is not None:
-        class_weights = calculate_class_weights(class_frequencies, weight_type=weight_type, smoothing=smoothing)
+        class_weights = calculate_class_weights(
+            class_frequencies, weight_type=weight_type, smoothing=class_weight_smoothing
+        )
         logger.info(f"Auto-calculated class weights: {class_weights}")
 
     if loss_type == "focal":

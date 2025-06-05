@@ -29,11 +29,13 @@ class TestDataUncoveredLines:
         from src.data import validate_dataset
 
         # Create a valid dataset with all required splits
-        dataset = DatasetDict({
-            "train": Dataset.from_dict({"tokens": [["Hello"]], "ner_tags": [[0]]}),
-            "validation": Dataset.from_dict({"tokens": [["World"]], "ner_tags": [[0]]}),
-            "test": Dataset.from_dict({"tokens": [["Test"]], "ner_tags": [[0]]})
-        })
+        dataset = DatasetDict(
+            {
+                "train": Dataset.from_dict({"tokens": [["Hello"]], "ner_tags": [[0]]}),
+                "validation": Dataset.from_dict({"tokens": [["World"]], "ner_tags": [[0]]}),
+                "test": Dataset.from_dict({"tokens": [["Test"]], "ner_tags": [[0]]}),
+            }
+        )
 
         # Should work even if multi-dataset import failed
         validate_dataset(dataset, ["O"])
@@ -47,10 +49,12 @@ class TestDataUncoveredLines:
 
         # Test with empty examples (line 106)
         examples = {"tokens": [], "ner_tags": []}
+
         # Create a mock that behaves like a BatchEncoding
         class MockBatchEncoding(dict):
             def word_ids(self, batch_index=0):
                 return []
+
         mock_result = MockBatchEncoding()
         tokenizer.return_value = mock_result
 
@@ -59,9 +63,11 @@ class TestDataUncoveredLines:
 
         # Test with None word_ids (lines 62-64)
         examples = {"tokens": [["Test"]], "ner_tags": [[0]]}
+
         class MockBatchEncoding2(dict):
             def word_ids(self, batch_index=0):
                 return [None, None, None]
+
         mock_result2 = MockBatchEncoding2({"input_ids": [[101, 2000, 102]]})
         tokenizer.return_value = mock_result2
 
@@ -94,7 +100,7 @@ class TestDataUncoveredLines:
                             "tokens": [["Sample"]]
                             # Missing ner_tags
                         }
-                    )
+                    ),
                 }
             )
             mock_load_dataset.return_value = mock_dataset

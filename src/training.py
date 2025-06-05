@@ -305,7 +305,7 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
                 and config.training.manual_class_weights is None
                 and focal_alpha is None,
                 weight_type=config.training.class_weight_type,
-                smoothing=config.training.class_weight_smoothing,
+                class_weight_smoothing=config.training.class_weight_smoothing,
             )
         elif config.training.loss_type == "label_smoothing":
             custom_loss_fn = create_loss_function(
@@ -333,7 +333,7 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
                 class_weights=config.training.manual_class_weights,
                 auto_weight=config.training.use_class_weights and config.training.manual_class_weights is None,
                 weight_type=config.training.class_weight_type,
-                smoothing=config.training.class_weight_smoothing,
+                class_weight_smoothing=config.training.class_weight_smoothing,
             )
         else:
             custom_loss_fn = create_loss_function(

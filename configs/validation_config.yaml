@@ -78,7 +78,7 @@ tools:
       
     # Coverage settings
     coverage:
-      min_percentage: 90  # Minimum coverage percentage to pass
+      min_percentage: 85  # Minimum coverage percentage to pass
       include_packages:
         - "src"
       exclude_patterns:

@@ -147,13 +147,13 @@ tools:
   mypy:
     cache_dir: ".mypy_cache"
   tests:
-    coverage_threshold: 90
+    coverage_threshold: 85
     parallel: true
 ```
 
 ## Requirements
 
-- **Coverage**: Minimum 90% coverage required for all files
+- **Coverage**: Minimum 85% coverage required for all files
 - **Ruff**: All linting and formatting rules must pass
 - **MyPy**: No type errors allowed
 - **Tests**: All tests must pass

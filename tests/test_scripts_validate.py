@@ -270,7 +270,9 @@ class TestPytestRunner:
     def test_test_runner_failure(self, mock_run):
         """Test failed test run."""
         mock_run.return_value = MagicMock(
-            returncode=1, stdout="3 passed, 2 failed\nTOTAL     100   50   50%", stderr="Some tests failed"
+            returncode=1,
+            stdout="================= 2 failed, 3 passed in 1.23s ==================\nTOTAL     100   50   50%",
+            stderr="Some tests failed",
         )
 
         runner = PytestRunner()
@@ -285,7 +287,9 @@ class TestPytestRunner:
     def test_parse_pytest_output_with_results(self):
         """Test parsing pytest output with results."""
         runner = PytestRunner()
-        output = "10 passed, 2 failed, 1 skipped\nTOTAL     200   40   80%"
+        output = (
+            "================= 2 failed, 10 passed, 1 skipped in 2.34s ==================\nTOTAL     200   40   80%"
+        )
 
         details = runner._parse_pytest_output(output)
 

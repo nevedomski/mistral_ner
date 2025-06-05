@@ -48,12 +48,12 @@ class DatasetMixer:
         for split in ["train", "validation", "test"]:
             # Collect this split from all datasets that have it
             split_datasets = []
-            split_weights = []
+            split_weights: list[float] | None = []
 
             for i, dataset in enumerate(datasets):
                 if split in dataset:
                     split_datasets.append(dataset[split])
-                    if weights:
+                    if weights and split_weights is not None:
                         split_weights.append(weights[i])
 
             if not split_datasets:
@@ -62,6 +62,8 @@ class DatasetMixer:
             # Normalize weights for this split if needed
             if split_weights:
                 split_weights = DatasetMixer._normalize_weights(split_weights, len(split_datasets))
+            else:
+                split_weights = None
 
             # Apply mixing strategy
             if strategy == "concat":

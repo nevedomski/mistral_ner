@@ -63,14 +63,16 @@ class UnifiedLabelSchema:
     @classmethod
     def get_bio_labels(cls) -> list[str]:
         """Get all labels in BIO format including O tag."""
-        labels = ["O"]
+        bio_labels = []
 
         # Get all entity types from class attributes
         for attr, value in cls.__dict__.items():
             if not attr.startswith("_") and isinstance(value, str):
-                labels.extend([f"B-{value}", f"I-{value}"])
+                bio_labels.extend([f"B-{value}", f"I-{value}"])
 
-        return sorted(set(labels))
+        # Sort the BIO labels but keep O at the front
+        sorted_bio_labels = sorted(set(bio_labels))
+        return ["O", *sorted_bio_labels]
 
 
 class LabelMapper:
@@ -100,7 +102,17 @@ class LabelMapper:
             Examples with mapped labels
         """
         # Get original label names if available
-        original_labels = examples[label_field].feature.names if hasattr(examples.get(label_field), "feature") else None
+        label_data = examples[label_field]
+        original_labels = None
+
+        # Try to get feature names if this is a HuggingFace dataset with features
+        if hasattr(label_data, "feature") and hasattr(label_data.feature, "names"):
+            original_labels = label_data.feature.names
+        # Also try checking if examples has features metadata
+        elif hasattr(examples, "features") and label_field in examples.features:
+            feature = examples.features[label_field]
+            if hasattr(feature, "feature") and hasattr(feature.feature, "names"):
+                original_labels = feature.feature.names
 
         mapped_tags = []
         for tags in examples[label_field]:
