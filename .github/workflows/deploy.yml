@@ -64,12 +64,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-    - name: Deploy to Cloud Run
-      id: deploy
-      uses: google-github-actions/deploy-cloudrun@v2
-      with:
-        service: mistral-ner-api
-        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service: mistral-ner-api
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
         region: us-central1
         env_vars: |
           MODEL_PATH=/models/mistral-ner-finetuned-final
