@@ -169,12 +169,33 @@ class TrainingConfig:
     warmup_ratio: float = 0.03
     max_grad_norm: float = 1.0
 
+    # Advanced optimizer configuration
+    adam_beta1: float = 0.9  # Beta1 for Adam optimizer
+    adam_beta2: float = 0.999  # Beta2 for Adam optimizer (try 0.95 for better convergence)
+    adam_epsilon: float = 1e-8  # Epsilon for numerical stability
+    gradient_clipping_value: float = 1.0  # Gradient clipping value
+    use_gradient_clipping: bool = True  # Enable gradient clipping
+
     # Loss function configuration
-    loss_type: str = "focal"  # 'focal', 'cross_entropy', 'label_smoothing', 'class_balanced'
+    loss_type: str = "focal"  # 'focal', 'cross_entropy', 'label_smoothing', 'class_balanced', 'weighted_cross_entropy'
     focal_alpha: float | None = None  # Auto-computed from class frequencies if None
     focal_gamma: float = 2.0  # Focusing parameter for focal loss
     label_smoothing: float = 0.1  # Only used if loss_type='label_smoothing'
     class_balanced_beta: float = 0.9999  # Only used if loss_type='class_balanced'
+
+    # Class weighting configuration
+    use_class_weights: bool = False  # Enable automatic class weight calculation
+    class_weight_type: str = "inverse"  # 'inverse', 'inverse_sqrt', 'effective'
+    class_weight_smoothing: float = 1.0  # Smoothing factor for weight calculation
+    manual_class_weights: list[float] | None = None  # Manual weights override auto-calculation
+
+    # Batch balancing configuration
+    use_batch_balancing: bool = False  # Enable balanced batch sampling
+    batch_balance_type: str = "balanced"  # 'balanced', 'entity_aware'
+    min_positive_ratio: float = 0.3  # Minimum ratio of positive samples per batch
+    batch_balance_beta: float = 0.999  # Beta for batch-balanced focal loss
+    log_batch_composition: bool = False  # Enable batch composition logging
+    log_batch_every_n: int = 100  # Log batch stats every N batches
 
     # Learning rate scheduling
     lr_scheduler_type: str = "cosine"  # 'linear', 'cosine', 'cosine_with_restarts', 'polynomial'
@@ -189,6 +210,12 @@ class TrainingConfig:
     metric_for_best_model: str = "eval_f1"
     greater_is_better: bool = True
     report_to: list[str] = field(default_factory=lambda: ["wandb"])
+
+    # Enhanced evaluation configuration
+    use_enhanced_evaluation: bool = False  # Enable detailed per-entity metrics
+    compute_entity_level_metrics: bool = True  # Compute metrics per entity type
+    log_confusion_matrix: bool = False  # Log confusion matrix to wandb
+    analyze_errors: bool = False  # Enable error analysis
 
     # Mixed precision
     fp16: bool = False

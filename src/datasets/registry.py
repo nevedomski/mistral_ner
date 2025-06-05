@@ -23,10 +23,14 @@ class DatasetRegistry:
     def _register_default_loaders(self) -> None:
         """Register default dataset loaders."""
         # Import here to avoid circular imports
+        from .loaders.ai4privacy import AI4PrivacyDataset
+        from .loaders.bigcode_pii import BigCodePIIDataset
         from .loaders.conll import CoNLLDataset
         from .loaders.fewnerd import FewNERDDataset
         from .loaders.gretel_pii import GretelPIIDataset
+        from .loaders.mendeley_pii import MendeleyPIIDataset
         from .loaders.ontonotes import OntoNotesDataset
+        from .loaders.wikiner import WikiNERDataset
         from .loaders.wnut import WNUTDataset
 
         self.register("conll2003", CoNLLDataset)
@@ -34,6 +38,10 @@ class DatasetRegistry:
         self.register("wnut17", WNUTDataset)
         self.register("fewnerd", FewNERDDataset)
         self.register("gretel_pii", GretelPIIDataset)
+        self.register("wikiner", WikiNERDataset)
+        self.register("ai4privacy", AI4PrivacyDataset)
+        self.register("mendeley_pii", MendeleyPIIDataset)
+        self.register("bigcode_pii", BigCodePIIDataset)
 
     def register(self, name: str, loader_class: type[BaseNERDataset]) -> None:
         """Register a dataset loader.
