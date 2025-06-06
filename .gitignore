@@ -82,9 +82,9 @@ checkpoint-*/
 Thumbs.db
 
 # Claude configuration
-# CLAUDE.local.md
-# CLAUDE.md
-# .claude
+CLAUDE.local.md
+CLAUDE.md
+.claude
 
 # Validation reports and artifacts
 validation_reports/
