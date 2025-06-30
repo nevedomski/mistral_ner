@@ -448,7 +448,11 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
                 return super().create_scheduler(num_training_steps, optimizer)
 
         def compute_loss(
-            self, model: PreTrainedModel, inputs: dict[str, Any], return_outputs: bool = False
+            self,
+            model: PreTrainedModel,
+            inputs: dict[str, Any],
+            return_outputs: bool = False,
+            num_items_in_batch: int | None = None,
         ) -> torch.Tensor | tuple[torch.Tensor, Any]:
             """Override compute_loss to use custom loss functions."""
             try:
@@ -478,7 +482,7 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
                     return loss
                 else:
                     # Use default loss computation
-                    return super().compute_loss(model, inputs, return_outputs)
+                    return super().compute_loss(model, inputs, return_outputs, num_items_in_batch)
 
             except torch.cuda.OutOfMemoryError:
                 logger.error("OOM in compute_loss, clearing cache and retrying...")
@@ -491,7 +495,7 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
                             # Reduce to half batch size
                             inputs[key] = inputs[key][: batch_size // 2]
 
-                return super().compute_loss(model, inputs, return_outputs)
+                return super().compute_loss(model, inputs, return_outputs, num_items_in_batch)
 
         def evaluation_loop(self, *args: Any, **kwargs: Any) -> Any:
             """Override evaluation loop to add memory management."""
