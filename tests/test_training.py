@@ -178,17 +178,11 @@ class TestCustomWandbCallback:
 class TestTrainingManager:
     """Test TrainingManager functionality."""
 
-    @patch("src.training.load_seqeval_metric")
-    def test_training_manager_initialization(self, mock_load_seqeval, sample_config):
+    def test_training_manager_initialization(self, sample_config):
         """Test training manager initialization."""
-        mock_metric = Mock()
-        mock_load_seqeval.return_value = mock_metric
-
         manager = TrainingManager(sample_config)
 
         assert manager.config == sample_config
-        assert manager.seqeval_metric == mock_metric
-        mock_load_seqeval.assert_called_once()
 
     @patch("src.training.detect_mixed_precision_support")
     @patch("src.training.Path")

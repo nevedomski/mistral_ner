@@ -6,7 +6,6 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-import evaluate
 import numpy as np
 import torch
 import wandb
@@ -16,20 +15,9 @@ from transformers import EvalPrediction, PreTrainedModel, PreTrainedTokenizerBas
 from datasets import Dataset
 
 if TYPE_CHECKING:
-    from evaluate import EvaluationModule
     from transformers import DataCollatorForTokenClassification
 
 logger = logging.getLogger("mistral_ner")
-
-
-def load_seqeval_metric() -> EvaluationModule | None:
-    """Load the seqeval metric for NER evaluation."""
-    try:
-        return evaluate.load("seqeval")
-    except Exception as e:
-        logger.warning(f"Failed to load seqeval from evaluate library: {e}")
-        # Fallback to direct seqeval usage
-        return None
 
 
 def align_predictions(
@@ -68,15 +56,12 @@ def align_predictions(
     return true_labels, pred_labels
 
 
-def compute_metrics_factory(
-    label_names: list[str], seqeval_metric: EvaluationModule | None = None
-) -> Callable[[EvalPrediction], dict[str, float]]:
+def compute_metrics_factory(label_names: list[str]) -> Callable[[EvalPrediction], dict[str, float]]:
     """
     Factory function to create compute_metrics function with label names.
 
     Args:
         label_names: List of label names
-        seqeval_metric: Pre-loaded seqeval metric (optional)
 
     Returns:
         compute_metrics function for trainer
@@ -89,30 +74,13 @@ def compute_metrics_factory(
         # Align predictions and labels
         true_labels, pred_labels = align_predictions(predictions, labels, label_names)
 
-        # Calculate metrics using seqeval
-        results = {}
-
-        if seqeval_metric is not None:
-            # Use evaluate library's seqeval
-            metric_results = seqeval_metric.compute(predictions=pred_labels, references=true_labels)
-            results.update(
-                {
-                    "precision": metric_results["overall_precision"],
-                    "recall": metric_results["overall_recall"],
-                    "f1": metric_results["overall_f1"],
-                    "accuracy": metric_results["overall_accuracy"],
-                }
-            )
-        else:
-            # Use seqeval directly
-            results.update(
-                {
-                    "precision": precision_score(true_labels, pred_labels),
-                    "recall": recall_score(true_labels, pred_labels),
-                    "f1": f1_score(true_labels, pred_labels),
-                    "accuracy": accuracy_score(true_labels, pred_labels),
-                }
-            )
+        # Calculate metrics using seqeval directly
+        results = {
+            "precision": precision_score(true_labels, pred_labels),
+            "recall": recall_score(true_labels, pred_labels),
+            "f1": f1_score(true_labels, pred_labels),
+            "accuracy": accuracy_score(true_labels, pred_labels),
+        }
 
         # Add per-entity metrics
         report = classification_report(true_labels, pred_labels, output_dict=True, zero_division=0)
@@ -317,7 +285,6 @@ def compute_detailed_metrics(
 
 def create_enhanced_compute_metrics(
     label_names: list[str],
-    seqeval_metric: EvaluationModule | None = None,
     compute_detailed: bool = True,
 ) -> Callable[[EvalPrediction], dict[str, float]]:
     """
@@ -325,13 +292,12 @@ def create_enhanced_compute_metrics(
 
     Args:
         label_names: List of label names
-        seqeval_metric: Pre-loaded seqeval metric
         compute_detailed: Whether to compute detailed metrics
 
     Returns:
         Enhanced compute_metrics function
     """
-    base_compute_metrics = compute_metrics_factory(label_names, seqeval_metric)
+    base_compute_metrics = compute_metrics_factory(label_names)
 
     def enhanced_compute_metrics(p: EvalPrediction) -> dict[str, float]:
         """Compute enhanced NER metrics with detailed analysis."""

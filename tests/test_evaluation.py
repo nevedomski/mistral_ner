@@ -18,7 +18,6 @@ from src.evaluation import (
     compute_confusion_matrix,
     compute_metrics_factory,
     evaluate_model,
-    load_seqeval_metric,
     log_confusion_matrix_to_wandb,
     print_evaluation_report,
     save_predictions,
@@ -64,30 +63,6 @@ def sample_label_ids():
     )
 
 
-class TestLoadSeqevalMetric:
-    """Test seqeval metric loading."""
-
-    @patch("src.evaluation.evaluate.load")
-    def test_load_seqeval_metric_success(self, mock_load):
-        """Test successful loading of seqeval metric."""
-        mock_metric = Mock()
-        mock_load.return_value = mock_metric
-
-        result = load_seqeval_metric()
-
-        mock_load.assert_called_once_with("seqeval")
-        assert result == mock_metric
-
-    @patch("src.evaluation.evaluate.load")
-    def test_load_seqeval_metric_failure(self, mock_load):
-        """Test fallback when seqeval loading fails."""
-        mock_load.side_effect = Exception("Loading failed")
-
-        result = load_seqeval_metric()
-
-        assert result is None
-
-
 class TestAlignPredictions:
     """Test prediction alignment functionality."""
 
@@ -131,24 +106,22 @@ class TestAlignPredictions:
 class TestComputeMetricsFactory:
     """Test metrics computation factory."""
 
-    def test_compute_metrics_with_seqeval_metric(self, sample_labels):
-        """Test metrics computation with seqeval metric."""
-        mock_seqeval = Mock()
-        mock_seqeval.compute.return_value = {
-            "overall_precision": 0.85,
-            "overall_recall": 0.80,
-            "overall_f1": 0.82,
-            "overall_accuracy": 0.90,
-        }
-
-        compute_metrics = compute_metrics_factory(sample_labels, mock_seqeval)
+    def test_compute_metrics_direct(self, sample_labels):
+        """Test metrics computation using seqeval directly."""
+        compute_metrics = compute_metrics_factory(sample_labels)
 
         # Create test data
         predictions = np.array([[[0.9, 0.1, 0, 0, 0, 0, 0]]])
         labels = np.array([[0]])
         eval_pred = EvalPrediction(predictions=predictions, label_ids=labels)
 
-        with patch("src.evaluation.classification_report") as mock_report:
+        with (
+            patch("src.evaluation.precision_score", return_value=0.85),
+            patch("src.evaluation.recall_score", return_value=0.80),
+            patch("src.evaluation.f1_score", return_value=0.82),
+            patch("src.evaluation.accuracy_score", return_value=0.90),
+            patch("src.evaluation.classification_report") as mock_report,
+        ):
             mock_report.return_value = {"O": {"f1-score": 0.95, "precision": 0.90, "recall": 0.85}}
 
             result = compute_metrics(eval_pred)
@@ -163,7 +136,7 @@ class TestComputeMetricsFactory:
         """Test metrics computation without seqeval metric."""
         mock_wandb.run = None
 
-        compute_metrics = compute_metrics_factory(sample_labels, None)
+        compute_metrics = compute_metrics_factory(sample_labels)
 
         predictions = np.array([[[0.9, 0.1, 0, 0, 0, 0, 0]]])
         labels = np.array([[0]])
@@ -190,7 +163,7 @@ class TestComputeMetricsFactory:
         """Test metrics computation with WandB logging."""
         mock_wandb.run = Mock()  # Simulate active run
 
-        compute_metrics = compute_metrics_factory(sample_labels, None)
+        compute_metrics = compute_metrics_factory(sample_labels)
 
         predictions = np.array([[[0.9, 0.1, 0, 0, 0, 0, 0]]])
         labels = np.array([[0]])
@@ -366,7 +339,7 @@ class TestLogConfusionMatrixToWandB:
 )
 def test_parametrized_metric_calls(metric_name, expected_calls, sample_labels):
     """Test that different metrics are called correctly."""
-    compute_metrics = compute_metrics_factory(sample_labels, None)
+    compute_metrics = compute_metrics_factory(sample_labels)
 
     predictions = np.array([[[0.9, 0.1, 0, 0, 0, 0, 0]]])
     labels = np.array([[0]])

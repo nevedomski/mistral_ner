@@ -144,7 +144,8 @@ def test_validate_wandb_config():
 
     with patch.dict(os.environ, {}, clear=True), pytest.warns(UserWarning, match="WANDB_API_KEY not found"):
         validate_wandb_config(config)
-        assert config.wandb_mode == "offline"
+
+    assert config.wandb_mode == "offline"
 
 
 def test_setup_logging_invalid_level():
