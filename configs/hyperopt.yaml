@@ -36,7 +36,7 @@ training:
   gradient_accumulation_steps: 8
   gradient_checkpointing: true
   optim: "paged_adamw_32bit"
-  learning_rate: 2e-4  # Default value, will be optimized
+  learning_rate: 0.0002  # Default value, will be optimized
   weight_decay: 0.001  # Default value, will be optimized
   warmup_ratio: 0.03  # Default value, will be optimized
   max_grad_norm: 1.0
@@ -129,8 +129,8 @@ hyperopt:
     # Learning rate optimization
     learning_rate:
       type: "loguniform"
-      low: 1e-5
-      high: 1e-3
+      low: 0.00001
+      high: 0.001
     
     # LoRA rank optimization  
     lora_r:
@@ -151,8 +151,8 @@ hyperopt:
     # Weight decay optimization
     weight_decay:
       type: "loguniform"
-      low: 1e-4
-      high: 1e-1
+      low: 0.0001
+      high: 0.1
   
   # Storage and persistence
   study_name: "mistral_ner_combined_optimization"
