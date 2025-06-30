@@ -396,7 +396,9 @@ class TestTrainingManager:
         mock_train_result.metrics = {"train_loss": 0.5, "eval_f1": 0.85}
         mock_trainer.train.return_value = mock_train_result
 
-        result = manager.train(mock_trainer)
+        # Mock Path.mkdir and Config.to_yaml to avoid file operations
+        with patch("src.training.Path.mkdir"), patch.object(manager.config, "to_yaml"):
+            result = manager.train(mock_trainer)
 
         assert result == mock_train_result.metrics
         mock_trainer.train.assert_called_once_with(resume_from_checkpoint=None)
@@ -418,7 +420,9 @@ class TestTrainingManager:
         mock_train_result.metrics = {"train_loss": 0.5}
         mock_trainer.train.return_value = mock_train_result
 
-        result = manager.train(mock_trainer, resume_from_checkpoint="/path/to/checkpoint")
+        # Mock Path.mkdir and Config.to_yaml to avoid file operations
+        with patch("src.training.Path.mkdir"), patch.object(manager.config, "to_yaml"):
+            result = manager.train(mock_trainer, resume_from_checkpoint="/path/to/checkpoint")
 
         assert result == mock_train_result.metrics
         mock_trainer.train.assert_called_once_with(resume_from_checkpoint="/path/to/checkpoint")
@@ -435,7 +439,12 @@ class TestTrainingManager:
         mock_trainer = Mock()
         mock_trainer.train.side_effect = KeyboardInterrupt()
 
-        with pytest.raises(KeyboardInterrupt):
+        # Mock Path.mkdir and Config.to_yaml to avoid file operations
+        with (
+            patch("src.training.Path.mkdir"),
+            patch.object(manager.config, "to_yaml"),
+            pytest.raises(KeyboardInterrupt),
+        ):
             manager.train(mock_trainer)
 
         # Verify checkpoint was saved

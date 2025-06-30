@@ -68,14 +68,20 @@ async def startup_event() -> None:
     logger = setup_logging()
     logger.info("Starting Mistral NER API server...")
 
-    # Load config
-    config_path = Path(__file__).parent.parent / "configs" / "default.yaml"
-    config = Config.from_yaml(str(config_path))
-
     # Model path from environment variable or default
     import os
 
     model_path = os.getenv("NER_MODEL_PATH", "./mistral-ner-finetuned-final")
+
+    # Load config - prefer model directory config if it exists
+    model_config_path = Path(model_path) / "config.yaml"
+    if model_config_path.exists():
+        logger.info(f"Loading config from model directory: {model_config_path}")
+        config = Config.from_yaml(str(model_config_path))
+    else:
+        config_path = Path(__file__).parent.parent / "configs" / "default.yaml"
+        logger.info(f"Loading config from: {config_path}")
+        config = Config.from_yaml(str(config_path))
     base_model = os.getenv("NER_BASE_MODEL", "mistralai/Mistral-7B-v0.3")
 
     try:

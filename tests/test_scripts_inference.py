@@ -525,6 +525,8 @@ class TestMain:
         mock_args = Mock()
         mock_args.text = None
         mock_args.file = None
+        mock_args.model_path = "/test/model"  # Add model_path attribute
+        mock_args.config = "configs/default.yaml"  # Add config attribute
         mock_parse_args.return_value = mock_args
 
         mock_logger = Mock()
