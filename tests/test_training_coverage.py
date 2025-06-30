@@ -209,20 +209,17 @@ class TestTrainingManager:
 
         return config
 
-    @patch("src.training.load_seqeval_metric")
     @patch("src.training.detect_mixed_precision_support")
-    def test_training_manager_init(self, mock_detect_mp: Mock, mock_load_seqeval: Mock) -> None:
+    def test_training_manager_init(self, mock_detect_mp: Mock) -> None:
         """Test TrainingManager initialization."""
         # Arrange
         config = self.create_mock_config()
-        mock_load_seqeval.return_value = Mock()
 
         # Act
         manager = TrainingManager(config)
 
         # Assert
         assert manager.config == config
-        mock_load_seqeval.assert_called_once()
 
     @patch("src.training.detect_mixed_precision_support")
     @patch("src.training.Path")

@@ -25,7 +25,7 @@ from transformers.integrations import WandbCallback
 from datasets import Dataset
 
 from .config import Config
-from .evaluation import compute_metrics_factory, load_seqeval_metric
+from .evaluation import compute_metrics_factory
 from .losses import compute_class_frequencies, create_loss_function
 from .schedulers import create_scheduler
 from .utils import check_gpu_memory, clear_gpu_cache, detect_mixed_precision_support
@@ -122,7 +122,6 @@ class TrainingManager:
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self.seqeval_metric = load_seqeval_metric()
 
     def create_training_arguments(self) -> TrainingArguments:
         """Create training arguments from config."""
@@ -204,11 +203,10 @@ class TrainingManager:
 
                 compute_metrics = create_enhanced_compute_metrics(
                     self.config.data.label_names,
-                    self.seqeval_metric,
                     compute_detailed=self.config.training.compute_entity_level_metrics,
                 )
             else:
-                compute_metrics = compute_metrics_factory(self.config.data.label_names, self.seqeval_metric)
+                compute_metrics = compute_metrics_factory(self.config.data.label_names)
 
         # Create callbacks
         callbacks = [
@@ -430,22 +428,23 @@ def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = 
 
         def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None) -> Any:
             """Create custom learning rate scheduler."""
-            if config.training.lr_scheduler_type not in ["linear"]:
-                # Use our custom scheduler
-                if optimizer is None:
-                    optimizer = self.optimizer
+            # Ensure we have an optimizer
+            if optimizer is None:
+                optimizer = self.optimizer
 
-                scheduler = create_scheduler(
-                    optimizer=optimizer,
-                    scheduler_type=config.training.lr_scheduler_type,
-                    training_args=self.args,
-                    num_training_steps=num_training_steps,
-                    **config.training.lr_scheduler_kwargs,
-                )
-                return scheduler
-            else:
-                # Use default transformers scheduler
-                return super().create_scheduler(num_training_steps, optimizer)
+            # For all scheduler types, use our custom scheduler implementation
+            # which properly handles all cases including "linear"
+            scheduler = create_scheduler(
+                optimizer=optimizer,
+                scheduler_type=config.training.lr_scheduler_type,
+                training_args=self.args,
+                num_training_steps=num_training_steps,
+                **config.training.lr_scheduler_kwargs,
+            )
+
+            # Set the scheduler on the trainer to avoid NoneType errors
+            self.lr_scheduler = scheduler
+            return scheduler
 
         def compute_loss(
             self,

@@ -16,37 +16,10 @@ from src.evaluation import (
     compute_metrics_factory,
     create_enhanced_compute_metrics,
     evaluate_model,
-    load_seqeval_metric,
     log_confusion_matrix_to_wandb,
     print_evaluation_report,
     save_predictions,
 )
-
-
-class TestLoadSeqevalMetric:
-    """Test load_seqeval_metric function."""
-
-    @patch("src.evaluation.evaluate.load")
-    def test_load_seqeval_metric_success(self, mock_load: Mock) -> None:
-        """Test successful loading of seqeval metric."""
-        mock_metric = Mock()
-        mock_load.return_value = mock_metric
-
-        result = load_seqeval_metric()
-
-        mock_load.assert_called_once_with("seqeval")
-        assert result is mock_metric
-
-    @patch("src.evaluation.evaluate.load")
-    @patch("src.evaluation.logger")
-    def test_load_seqeval_metric_failure(self, mock_logger: Mock, mock_load: Mock) -> None:
-        """Test fallback when seqeval loading fails."""
-        mock_load.side_effect = Exception("Loading failed")
-
-        result = load_seqeval_metric()
-
-        mock_logger.warning.assert_called_once()
-        assert result is None
 
 
 class TestAlignPredictions:
@@ -147,10 +120,16 @@ class TestComputeMetricsFactory:
         eval_pred = EvalPrediction(predictions=predictions, label_ids=labels)
 
         # Act
-        compute_metrics = compute_metrics_factory(label_names, mock_seqeval)
+        compute_metrics = compute_metrics_factory(label_names)
 
-        # Mock classification_report
-        with patch("src.evaluation.classification_report") as mock_report:
+        # Mock all seqeval functions
+        with (
+            patch("src.evaluation.precision_score", return_value=0.85),
+            patch("src.evaluation.recall_score", return_value=0.80),
+            patch("src.evaluation.f1_score", return_value=0.82),
+            patch("src.evaluation.accuracy_score", return_value=0.88),
+            patch("src.evaluation.classification_report") as mock_report,
+        ):
             mock_report.return_value = {
                 "B-PER": {"precision": 0.9, "recall": 0.8, "f1-score": 0.85},
                 "O": {"precision": 0.95, "recall": 0.9, "f1-score": 0.92},
@@ -201,7 +180,7 @@ class TestComputeMetricsFactory:
         eval_pred = EvalPrediction(predictions=predictions, label_ids=labels)
 
         # Act
-        compute_metrics = compute_metrics_factory(label_names, seqeval_metric=None)
+        compute_metrics = compute_metrics_factory(label_names)
         result = compute_metrics(eval_pred)
 
         # Assert
@@ -223,7 +202,7 @@ class TestComputeMetricsFactory:
         eval_pred = EvalPrediction(predictions=predictions, label_ids=labels)
 
         # Act
-        compute_metrics = compute_metrics_factory(label_names, seqeval_metric=None)
+        compute_metrics = compute_metrics_factory(label_names)
 
         with (
             patch("src.evaluation.precision_score", return_value=0.85),
