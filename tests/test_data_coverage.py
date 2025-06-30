@@ -45,7 +45,10 @@ class TestDataFunctions:
         """Test creating sample dataset with config."""
         config = Config()
         config.data.multi_dataset.enabled = True
-        config.data.label_names = ["O", "B-TEST", "I-TEST"]
+        # Update the unified labels instead of trying to set label_names directly
+        config.data.multi_dataset.unified_labels = ["O", "B-TEST", "I-TEST"]
+        # Re-initialize labels after changing multi_dataset config
+        config.data._initialize_labels()
 
         dataset = create_sample_dataset(size=10, config=config)
 

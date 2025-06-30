@@ -23,7 +23,9 @@ class TestMultiDatasetConfig:
         """Test that enabling multi-dataset uses unified labels."""
         config = Config()
         config.data.multi_dataset.enabled = True
-        config.data.__post_init__()  # Re-initialize labels
+        # Force reinitialization by setting _label_names to None first
+        config.data._label_names = None
+        config.data._initialize_labels()  # Re-initialize labels
 
         assert len(config.data.label_names) == 55  # Unified schema
         assert "B-CARD" in config.data.label_names  # PII label

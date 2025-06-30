@@ -136,20 +136,50 @@ class DataConfig:
     multi_dataset: MultiDatasetConfig = field(default_factory=MultiDatasetConfig)
 
     # Label configuration - will be set based on mode
-    label_names: list[str] = field(init=False)
-    id2label: dict[int, str] = field(init=False)
-    label2id: dict[str, int] = field(init=False)
+    _label_names: list[str] | None = field(init=False, default=None)
+    _id2label: dict[int, str] | None = field(init=False, default=None)
+    _label2id: dict[str, int] | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
-        # Set labels based on mode
-        if self.multi_dataset.enabled:
-            self.label_names = self.multi_dataset.unified_labels
-        else:
-            # Default CoNLL-2003 labels for backward compatibility
-            self.label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
+        """Initialize label mappings based on dataset mode."""
+        self._initialize_labels()
 
-        self.id2label = {i: label for i, label in enumerate(self.label_names)}
-        self.label2id = {label: i for i, label in enumerate(self.label_names)}
+    def _initialize_labels(self) -> None:
+        """Initialize label mappings if not already set."""
+        if self._label_names is None:
+            # Set labels based on mode
+            if self.multi_dataset.enabled:
+                self._label_names = self.multi_dataset.unified_labels
+            else:
+                # Default CoNLL-2003 labels for backward compatibility
+                self._label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"]
+
+            self._id2label = {i: label for i, label in enumerate(self._label_names)}
+            self._label2id = {label: i for i, label in enumerate(self._label_names)}
+
+    @property
+    def label_names(self) -> list[str]:
+        """Get label names, initializing if necessary."""
+        if self._label_names is None:
+            self._initialize_labels()
+        assert self._label_names is not None  # Type narrowing for mypy
+        return self._label_names
+
+    @property
+    def id2label(self) -> dict[int, str]:
+        """Get id to label mapping, initializing if necessary."""
+        if self._id2label is None:
+            self._initialize_labels()
+        assert self._id2label is not None  # Type narrowing for mypy
+        return self._id2label
+
+    @property
+    def label2id(self) -> dict[str, int]:
+        """Get label to id mapping, initializing if necessary."""
+        if self._label2id is None:
+            self._initialize_labels()
+        assert self._label2id is not None  # Type narrowing for mypy
+        return self._label2id
 
 
 @dataclass
@@ -291,13 +321,18 @@ class Config:
             config.model = ModelConfig(**config_dict["model"])
         if "data" in config_dict:
             data_dict = config_dict["data"].copy()
+            # Remove computed fields that might be in the YAML
+            computed_fields = ["label_names", "id2label", "label2id", "_label_names", "_id2label", "_label2id"]
+            for field in computed_fields:
+                data_dict.pop(field, None)
+
             # Handle nested multi_dataset config
             if "multi_dataset" in data_dict:
                 multi_dataset_dict = data_dict.pop("multi_dataset")
                 config.data = DataConfig(**data_dict)
                 config.data.multi_dataset = MultiDatasetConfig(**multi_dataset_dict)
                 # Re-initialize labels based on multi-dataset mode
-                config.data.__post_init__()
+                config.data._initialize_labels()
             else:
                 config.data = DataConfig(**data_dict)
         if "training" in config_dict:
@@ -312,7 +347,11 @@ class Config:
     def to_yaml(self, yaml_path: str | Path) -> None:
         """Save configuration to YAML file."""
         # Create clean dictionaries without computed fields
-        data_dict = {k: v for k, v in self.data.__dict__.items() if k not in ["id2label", "label2id", "label_names"]}
+        data_dict = {
+            k: v
+            for k, v in self.data.__dict__.items()
+            if k not in ["_id2label", "_label2id", "_label_names", "id2label", "label2id", "label_names"]
+        }
 
         # Convert multi_dataset to dict if it exists
         if "multi_dataset" in data_dict and data_dict["multi_dataset"] is not None:

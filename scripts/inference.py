@@ -215,8 +215,14 @@ def main() -> None:
     # Setup logging
     logger = setup_logging()
 
-    # Load config
-    config = Config.from_yaml(args.config)
+    # Load config - prefer model directory config if it exists
+    config_path = Path(args.model_path) / "config.yaml"
+    if config_path.exists():
+        logger.info(f"Loading config from model directory: {config_path}")
+        config = Config.from_yaml(config_path)
+    else:
+        logger.info(f"Loading config from: {args.config}")
+        config = Config.from_yaml(args.config)
 
     # Load model
     logger.info("Loading model...")

@@ -420,8 +420,45 @@ class TestSetupModel:
 class TestSaveModelCheckpoint:
     """Test model checkpoint saving."""
 
-    def test_save_model_checkpoint_success(self):
+    def test_save_model_checkpoint_success(self, sample_config):
         """Test successful model checkpoint saving."""
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            save_model_checkpoint(mock_model, mock_tokenizer, temp_dir, config=sample_config)
+
+            mock_model.save_pretrained.assert_called_once_with(temp_dir)
+            mock_tokenizer.save_pretrained.assert_called_once_with(temp_dir)
+
+    def test_save_model_checkpoint_final(self, sample_config):
+        """Test saving final model checkpoint."""
+        mock_model = Mock()
+        mock_tokenizer = Mock()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            save_model_checkpoint(mock_model, mock_tokenizer, temp_dir, is_final=True, config=sample_config)
+
+            mock_model.save_pretrained.assert_called_once_with(temp_dir)
+            mock_tokenizer.save_pretrained.assert_called_once_with(temp_dir)
+
+    @patch("src.model.Path")
+    def test_save_model_checkpoint_failure(self, mock_path, sample_config):
+        """Test model checkpoint saving failure."""
+        mock_model = Mock()
+        mock_model.save_pretrained.side_effect = Exception("Save failed")
+        mock_tokenizer = Mock()
+
+        # Mock Path to avoid directory creation errors
+        mock_path_instance = Mock()
+        mock_path.return_value = mock_path_instance
+        mock_path_instance.mkdir.return_value = None
+
+        with pytest.raises(Exception, match="Save failed"):
+            save_model_checkpoint(mock_model, mock_tokenizer, "/invalid/path", config=sample_config)
+
+    def test_save_model_checkpoint_without_config(self):
+        """Test model checkpoint saving without config (backward compatibility)."""
         mock_model = Mock()
         mock_tokenizer = Mock()
 
@@ -430,26 +467,20 @@ class TestSaveModelCheckpoint:
 
             mock_model.save_pretrained.assert_called_once_with(temp_dir)
             mock_tokenizer.save_pretrained.assert_called_once_with(temp_dir)
+            # Verify config.yaml was not created
+            assert not (Path(temp_dir) / "config.yaml").exists()
 
-    def test_save_model_checkpoint_final(self):
-        """Test saving final model checkpoint."""
+    def test_save_model_checkpoint_with_config_saves_yaml(self, sample_config):
+        """Test that config is saved as YAML when provided."""
         mock_model = Mock()
         mock_tokenizer = Mock()
+        sample_config.to_yaml = Mock()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            save_model_checkpoint(mock_model, mock_tokenizer, temp_dir, is_final=True)
+            save_model_checkpoint(mock_model, mock_tokenizer, temp_dir, config=sample_config)
 
-            mock_model.save_pretrained.assert_called_once_with(temp_dir)
-            mock_tokenizer.save_pretrained.assert_called_once_with(temp_dir)
-
-    def test_save_model_checkpoint_failure(self):
-        """Test model checkpoint saving failure."""
-        mock_model = Mock()
-        mock_model.save_pretrained.side_effect = Exception("Save failed")
-        mock_tokenizer = Mock()
-
-        with pytest.raises(Exception, match="Save failed"):
-            save_model_checkpoint(mock_model, mock_tokenizer, "/invalid/path")
+            # Verify config.to_yaml was called with the correct path
+            sample_config.to_yaml.assert_called_once_with(Path(temp_dir) / "config.yaml")
 
 
 class TestLoadModelFromCheckpoint:

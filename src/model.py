@@ -5,6 +5,7 @@ from __future__ import annotations
 import gc
 import logging
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
@@ -234,11 +235,18 @@ def setup_model(
 
 
 def save_model_checkpoint(
-    model: PreTrainedModel | PeftModel, tokenizer: PreTrainedTokenizerBase, output_dir: str, is_final: bool = False
+    model: PreTrainedModel | PeftModel,
+    tokenizer: PreTrainedTokenizerBase,
+    output_dir: str,
+    is_final: bool = False,
+    config: Config | None = None,
 ) -> None:
-    """Save model checkpoint."""
+    """Save model checkpoint with configuration."""
     try:
         logger.info(f"Saving {'final' if is_final else 'checkpoint'} to {output_dir}")
+
+        # Create output directory if it doesn't exist
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # Save model
         model.save_pretrained(output_dir)
@@ -246,7 +254,13 @@ def save_model_checkpoint(
         # Save tokenizer
         tokenizer.save_pretrained(output_dir)
 
-        logger.info("Model and tokenizer saved successfully")
+        # Save config if provided
+        if config is not None:
+            config_path = Path(output_dir) / "config.yaml"
+            config.to_yaml(config_path)
+            logger.info(f"Config saved to {config_path}")
+
+        logger.info("Model, tokenizer, and config saved successfully")
 
     except Exception as e:
         logger.error(f"Failed to save model checkpoint: {e}")

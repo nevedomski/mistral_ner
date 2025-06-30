@@ -24,6 +24,7 @@ from transformers.integrations import WandbCallback
 
 from datasets import Dataset
 
+from .config import Config
 from .evaluation import compute_metrics_factory, load_seqeval_metric
 from .losses import compute_class_frequencies, create_loss_function
 from .schedulers import create_scheduler
@@ -80,6 +81,40 @@ class CustomWandbCallback(WandbCallback):
                         logs[f"gpu/{gpu_id}/memory_util_percent"] = stats["utilization_percent"]
 
         super().on_log(args, state, control, model=model, logs=logs, **kwargs)
+
+
+class ConfigSaveCallback(TrainerCallback):
+    """Callback to save config alongside model checkpoints."""
+
+    def __init__(self, config: Config) -> None:
+        """Initialize with config to save."""
+        self.config = config
+
+    def on_save(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs: Any,
+    ) -> None:
+        """Save config when model checkpoint is saved."""
+        # Save config to the output directory
+        output_dir = args.output_dir
+
+        # If we're saving the best model at the end, also save to that directory
+        if args.should_save:
+            # For regular checkpoints, save in checkpoint directory
+            if state.best_model_checkpoint:
+                checkpoint_folder = Path(output_dir) / f"checkpoint-{state.global_step}"
+                if checkpoint_folder.exists():
+                    config_path = checkpoint_folder / "config.yaml"
+                    self.config.to_yaml(config_path)
+                    logger.info(f"Config saved to checkpoint: {config_path}")
+
+            # Always save to main output directory
+            config_path = Path(output_dir) / "config.yaml"
+            self.config.to_yaml(config_path)
+            logger.info(f"Config saved to: {config_path}")
 
 
 class TrainingManager:
@@ -178,6 +213,7 @@ class TrainingManager:
         # Create callbacks
         callbacks = [
             MemoryCallback(clear_cache_steps=self.config.training.clear_cache_steps),
+            ConfigSaveCallback(config=self.config),
         ]
 
         # Add early stopping callback
@@ -231,6 +267,10 @@ class TrainingManager:
                 logger.info(f"Saving final model to {self.config.training.final_output_dir}")
                 trainer.save_model(self.config.training.final_output_dir)
                 trainer.save_state()
+                # Save config to final output directory
+                config_path = Path(self.config.training.final_output_dir) / "config.yaml"
+                self.config.to_yaml(config_path)
+                logger.info(f"Config saved to final output: {config_path}")
 
             return train_result.metrics  # type: ignore[no-any-return]
 
@@ -246,6 +286,10 @@ class TrainingManager:
             logger.info(f"Saving interrupted checkpoint to {checkpoint_dir}")
             trainer.save_model(checkpoint_dir)
             trainer.save_state()
+            # Save config to interrupted checkpoint
+            config_path = Path(checkpoint_dir) / "config.yaml"
+            self.config.to_yaml(config_path)
+            logger.info(f"Config saved to interrupted checkpoint: {config_path}")
             raise
 
         except Exception as e:
