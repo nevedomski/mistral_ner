@@ -60,8 +60,8 @@ class OntoNotesDataset(BaseNERDataset):
         # Return the dataset as-is for now - it should already be in the right format
         return dataset
 
-    def get_label_mapping(self) -> dict[str, str]:
-        """Get label mapping for OntoNotes to unified schema."""
+    def get_default_label_mapping(self) -> dict[str, str]:
+        """Get default label mapping for OntoNotes to unified schema."""
         return {
             "O": "O",
             # Person
@@ -70,10 +70,10 @@ class OntoNotesDataset(BaseNERDataset):
             # Organizations
             "B-ORG": "B-ORG",
             "I-ORG": "I-ORG",
-            # Locations
+            # Locations - default: preserve all location types
             "B-LOC": "B-LOC",
             "I-LOC": "I-LOC",
-            "B-GPE": "B-GPE",  # Geo-political entities (cities, countries)
+            "B-GPE": "B-GPE",  # Geo-political entities
             "I-GPE": "I-GPE",
             "B-FAC": "B-FAC",  # Facilities
             "I-FAC": "I-FAC",

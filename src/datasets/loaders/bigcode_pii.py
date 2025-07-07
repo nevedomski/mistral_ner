@@ -102,7 +102,7 @@ class BigCodePIIDataset(BaseNERDataset):
             {"train": train_val_test["train"], "validation": val_test["train"], "test": val_test["test"]}
         )
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping from BigCode to unified schema.
 
         BigCode PII focuses on code-specific PII like keys, tokens, emails, etc.

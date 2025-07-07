@@ -117,7 +117,7 @@ class GretelPIIDataset(BaseNERDataset):
 
         return DatasetDict(converted_splits)
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping for Gretel PII types to unified schema."""
         return {
             "O": "O",
@@ -135,6 +135,10 @@ class GretelPIIDataset(BaseNERDataset):
             "I-IBAN": "I-BANK",
             "B-SWIFT": "B-BANK",
             "I-SWIFT": "I-BANK",
+            "B-ROUTING_NUMBER": "B-BANK",  # Add routing number mapping
+            "I-ROUTING_NUMBER": "I-BANK",
+            "B-ACCOUNT_NUMBER": "B-BANK",  # Add account number mapping
+            "I-ACCOUNT_NUMBER": "I-BANK",
             # Government IDs
             "B-SSN": "B-SSN",
             "I-SSN": "I-SSN",
@@ -142,6 +146,8 @@ class GretelPIIDataset(BaseNERDataset):
             "I-PASSPORT": "I-PASSPORT",
             "B-LICENSE": "B-LICENSE",
             "I-LICENSE": "I-LICENSE",
+            "B-DRIVER_LICENSE": "B-LICENSE",  # Alternative naming
+            "I-DRIVER_LICENSE": "I-LICENSE",
             # Contact
             "B-PHONE": "B-PHONE",
             "I-PHONE": "I-PHONE",
@@ -149,19 +155,41 @@ class GretelPIIDataset(BaseNERDataset):
             "I-EMAIL": "I-EMAIL",
             "B-ADDRESS": "B-ADDR",
             "I-ADDRESS": "I-ADDR",
+            # Locations -> ADDR for bank PII
+            "B-CITY": "B-ADDR",
+            "I-CITY": "I-ADDR",
+            "B-STATE": "B-ADDR",
+            "I-STATE": "I-ADDR",
+            "B-COUNTRY": "B-ADDR",
+            "I-COUNTRY": "I-ADDR",
+            "B-ZIPCODE": "B-ADDR",
+            "I-ZIPCODE": "I-ADDR",
             # Dates and numbers
             "B-DATE": "B-DATE",
             "I-DATE": "I-DATE",
             "B-DOB": "B-DATE",  # Date of birth -> DATE
             "I-DOB": "I-DATE",
+            "B-DATE_OF_BIRTH": "B-DATE",  # Alternative naming
+            "I-DATE_OF_BIRTH": "I-DATE",
             # Organizations
             "B-COMPANY": "B-ORG",
             "I-COMPANY": "I-ORG",
             "B-ORGANIZATION": "B-ORG",
             "I-ORGANIZATION": "I-ORG",
+            # Monetary values
+            "B-AMOUNT": "B-MONEY",
+            "I-AMOUNT": "I-MONEY",
+            "B-CURRENCY": "B-MONEY",
+            "I-CURRENCY": "I-MONEY",
             # Generic PII
             "B-PII": "B-MISC",  # Generic PII -> MISC
             "I-PII": "I-MISC",
+            "B-USERNAME": "B-MISC",
+            "I-USERNAME": "I-MISC",
+            "B-PASSWORD": "B-MISC",
+            "I-PASSWORD": "I-MISC",
+            "B-IP_ADDRESS": "B-MISC",
+            "I-IP_ADDRESS": "I-MISC",
         }
 
     def preprocess(self, examples: dict[str, Any]) -> dict[str, Any]:

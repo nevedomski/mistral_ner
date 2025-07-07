@@ -2,11 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Fine-tune Mistral-7B for Named Entity Recognition (NER) on the CoNLL-2003 dataset using 8-bit quantization and LoRA for memory-efficient training.
+Fine-tune Mistral-7B for Named Entity Recognition (NER) using 8-bit quantization and LoRA for memory-efficient training. Supports multi-dataset training with 9 built-in datasets and flexible label mapping for unified entity schemas.
 
 ## Features
 
 - **Memory-efficient training**: 8-bit quantization + LoRA reduces memory usage by ~75%
+- **Multi-dataset training**: Train on multiple NER datasets simultaneously with automatic label unification
+- **Flexible label mapping**: Profile-based, file-based, or inline label mappings for dataset compatibility
+- **9 built-in datasets**: Support for CoNLL-2003, OntoNotes, WNUT-17, Few-NERD, WikiNER, and 4 PII datasets
 - **Modular architecture**: Clean separation of concerns for easy customization
 - **WandB integration**: Optional experiment tracking (can be disabled)
 - **Checkpoint resumption**: Resume training from any checkpoint
@@ -109,6 +112,23 @@ python scripts/train.py --resume-from-checkpoint ./mistral-ner-finetuned/checkpo
 Multi-GPU training:
 ```bash
 accelerate launch scripts/train.py
+```
+
+### Multi-Dataset Training
+
+Train on multiple datasets with automatic label unification:
+```bash
+python scripts/train.py --config configs/bank_pii.yaml
+```
+
+Example multi-dataset configuration:
+```yaml
+data:
+  multi_dataset:
+    enabled: true
+    dataset_names: ["conll2003", "ontonotes", "gretel_pii", "ai4privacy"]
+    dataset_weights: [0.15, 0.25, 0.3, 0.3]
+    label_mapping_profile: "bank_pii"  # Use predefined mappings
 ```
 
 ### Inference

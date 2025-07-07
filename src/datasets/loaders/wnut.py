@@ -42,7 +42,7 @@ class WNUTDataset(BaseNERDataset):
             logger.error(f"Failed to load WNUT-17 dataset: {e}")
             raise
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping for WNUT-17 to unified schema."""
         return {
             "O": "O",

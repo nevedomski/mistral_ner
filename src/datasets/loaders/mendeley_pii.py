@@ -66,7 +66,7 @@ class MendeleyPIIDataset(BaseNERDataset):
             logger.error(f"Failed to load Mendeley PII dataset: {e}")
             raise
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping from Mendeley to unified schema.
 
         Returns:

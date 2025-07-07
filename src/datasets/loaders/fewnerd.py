@@ -98,7 +98,7 @@ class FewNERDDataset(BaseNERDataset):
 
         return dataset.map(add_bio_tags, batched=True)
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping for Few-NERD coarse-grained types."""
         # Coarse-grained types mapping
         coarse_mapping = {

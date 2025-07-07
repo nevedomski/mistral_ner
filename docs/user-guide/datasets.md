@@ -374,31 +374,118 @@ data:
 
 **Use when**: You want fine control over dataset contribution.
 
-### Label Mapping
+### Label Mapping System
 
-When combining datasets, label conflicts are automatically resolved:
+Mistral NER provides a flexible label mapping system to unify different label schemas across datasets. This is essential when combining datasets with different naming conventions or when you want to merge certain entity types.
+
+#### Configuration Methods
+
+##### 1. Profile-Based Mapping (Recommended)
+
+Use predefined mapping profiles for common use cases:
+
+```yaml
+data:
+  multi_dataset:
+    enabled: true
+    dataset_names: ["conll2003", "ontonotes", "gretel_pii", "ai4privacy"]
+    label_mapping_profile: "bank_pii"  # Predefined profile
+```
+
+Available profiles:
+- `bank_pii`: Maps all location types to ADDR for banking/financial PII detection
+- `general`: Preserves most entity distinctions (default behavior)
+
+##### 2. External Mapping Files
+
+Define mappings in separate YAML files for better organization:
+
+```yaml
+data:
+  multi_dataset:
+    label_mappings:
+      conll2003: "conll2003_bank_pii.yaml"
+      ontonotes: "ontonotes_custom.yaml"
+      gretel_pii: "gretel_pii_custom.yaml"
+```
+
+Example mapping file (`configs/mappings/conll2003_bank_pii.yaml`):
+```yaml
+# Map CoNLL-2003 labels to unified schema
+O: O
+B-PER: B-PER
+I-PER: I-PER
+B-ORG: B-ORG
+I-ORG: I-ORG
+B-LOC: B-ADDR  # Map locations to addresses
+I-LOC: I-ADDR
+B-MISC: B-MISC
+I-MISC: I-MISC
+```
+
+##### 3. Inline Mapping
+
+Define mappings directly in the configuration:
+
+```yaml
+data:
+  multi_dataset:
+    label_mappings:
+      conll2003:
+        B-LOC: B-ADDR
+        I-LOC: I-ADDR
+      ontonotes:
+        B-GPE: B-ADDR
+        I-GPE: I-ADDR
+        B-FAC: B-ADDR
+        I-FAC: I-ADDR
+```
+
+#### Label Unification Example
+
+When combining datasets, label conflicts are resolved using your chosen mapping:
 
 ```mermaid
 graph LR
     subgraph "Dataset 1 (CoNLL)"
-        A1[PER] --> U1[PERSON]
-        A2[ORG] --> U2[ORGANIZATION]
-        A3[LOC] --> U3[LOCATION]
+        A1[PER] --> U1[PER]
+        A2[ORG] --> U2[ORG]
+        A3[LOC] --> U3[ADDR]
     end
     
     subgraph "Dataset 2 (OntoNotes)"
         B1[PERSON] --> U1
         B2[ORG] --> U2
         B3[GPE] --> U3
-        B4[FAC] --> U4[FACILITY]
+        B4[FAC] --> U3
     end
     
     subgraph "Unified Schema"
-        U1
-        U2
-        U3
-        U4
+        U1[PER - Person]
+        U2[ORG - Organization]
+        U3[ADDR - All Locations]
     end
+```
+
+#### Creating Custom Mapping Profiles
+
+Add new profiles to `src/datasets/mapping_profiles.py`:
+
+```python
+class MappingProfiles:
+    # Custom profile for medical domain
+    MEDICAL = {
+        "conll2003": {
+            "B-PER": "B-PATIENT",
+            "I-PER": "I-PATIENT",
+            "B-ORG": "B-PROVIDER",
+            "I-ORG": "I-PROVIDER",
+            # ... more mappings
+        },
+        "ontonotes": {
+            # ... dataset-specific mappings
+        }
+    }
 ```
 
 ### Configuration Examples

@@ -49,7 +49,7 @@ class TestWikiNERDataset:
     def test_get_label_mapping(self):
         """Test label mapping."""
         loader = WikiNERDataset()
-        mapping = loader.get_label_mapping()
+        mapping = loader.get_default_label_mapping()
 
         assert mapping["O"] == "O"
         assert mapping["B-PER"] == "B-PER"
@@ -130,14 +130,14 @@ class TestAI4PrivacyDataset:
     def test_get_label_mapping(self):
         """Test comprehensive label mapping."""
         loader = AI4PrivacyDataset()
-        mapping = loader.get_label_mapping()
+        mapping = loader.get_default_label_mapping()
 
         # Check some key mappings
         assert mapping["O"] == "O"
         assert mapping["B-FIRSTNAME"] == "B-PER"
         assert mapping["I-FIRSTNAME"] == "I-PER"
         assert mapping["B-COMPANY_NAME"] == "B-ORG"
-        assert mapping["B-CITY"] == "B-LOC"
+        assert mapping["B-CITY"] == "B-ADDR"  # Default now maps to ADDR
         assert mapping["B-CREDITCARDNUMBER"] == "B-CARD"
         assert mapping["B-EMAIL"] == "B-EMAIL"
         assert mapping["B-SSN"] == "B-SSN"
@@ -254,7 +254,7 @@ class TestMendeleyPIIDataset:
     def test_get_label_mapping(self):
         """Test label mapping."""
         loader = MendeleyPIIDataset()
-        mapping = loader.get_label_mapping()
+        mapping = loader.get_default_label_mapping()
 
         # Check key mappings
         assert mapping["O"] == "O"
@@ -439,7 +439,7 @@ class TestBigCodePIIDataset:
     def test_get_label_mapping(self):
         """Test label mapping."""
         loader = BigCodePIIDataset()
-        mapping = loader.get_label_mapping()
+        mapping = loader.get_default_label_mapping()
 
         # Check key mappings
         assert mapping["O"] == "O"

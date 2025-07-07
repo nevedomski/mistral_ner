@@ -43,10 +43,11 @@ class CoNLLDataset(BaseNERDataset):
             logger.error(f"Failed to load CoNLL-2003 dataset: {e}")
             raise
 
-    def get_label_mapping(self) -> dict[str, str]:
-        """Get label mapping for CoNLL-2003.
+    def get_default_label_mapping(self) -> dict[str, str]:
+        """Get default label mapping for CoNLL-2003.
 
-        CoNLL-2003 already uses a compatible schema, so minimal mapping needed.
+        CoNLL-2003 already uses a compatible schema, so this returns
+        an identity mapping by default.
         """
         return {
             "O": "O",
@@ -54,8 +55,8 @@ class CoNLLDataset(BaseNERDataset):
             "I-PER": "I-PER",
             "B-ORG": "B-ORG",
             "I-ORG": "I-ORG",
-            "B-LOC": "B-LOC",
-            "I-LOC": "I-LOC",
+            "B-LOC": "B-LOC",  # Default: preserve LOC
+            "I-LOC": "I-LOC",  # Default: preserve LOC
             "B-MISC": "B-MISC",
             "I-MISC": "I-MISC",
         }

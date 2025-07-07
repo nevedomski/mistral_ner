@@ -1,0 +1,12 @@
+# CoNLL-2003 label mapping for bank PII use case
+# Maps all location entities to ADDR
+
+O: O
+B-PER: B-PER
+I-PER: I-PER
+B-ORG: B-ORG
+I-ORG: I-ORG
+B-LOC: B-ADDR  # Map locations to addresses
+I-LOC: I-ADDR
+B-MISC: B-MISC
+I-MISC: I-MISC

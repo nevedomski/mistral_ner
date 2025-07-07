@@ -79,25 +79,47 @@ data:
   dataset_name: "conll2003"                 # Dataset identifier
   
   # OR Multi-dataset configuration
-  dataset_configs:
-    - name: conll2003
-      split: train
-      language: en                          # For multilingual datasets
-      weight: 1.0                           # Sampling weight
+  multi_dataset:
+    enabled: true                           # Enable multi-dataset mode
+    dataset_names:                          # List of datasets to use
+      - "conll2003"
+      - "ontonotes"
+      - "gretel_pii"
+      - "ai4privacy"
     
-    - name: ontonotes
-      split: train
-      subset: english_v4
-      weight: 1.5
+    dataset_weights: [0.15, 0.25, 0.3, 0.3] # Sampling weights for each dataset
     
-    - name: gretel_pii
-      split: train
-      max_examples: 10000                   # Limit dataset size
-  
-  # Mixing strategy for multiple datasets
-  mixing_strategy: "interleave"             # concatenate, interleave, weighted
-  interleave_probs: [0.6, 0.4]             # Dataset sampling probabilities
-  sampling_temperature: 1.0                 # Temperature for weighted sampling
+    # Mixing strategy for multiple datasets
+    mixing_strategy: "interleave"           # concatenate, interleave, weighted
+    sampling_temperature: 1.0               # Temperature for weighted sampling
+    
+    # Label mapping configuration
+    label_mapping_profile: "bank_pii"       # Use predefined mapping profile
+    
+    # Alternative: Per-dataset mapping files
+    # label_mappings:
+    #   conll2003: "conll2003_bank_pii.yaml"
+    #   ontonotes: "ontonotes_bank_pii.yaml"
+    
+    # Alternative: Inline mappings
+    # label_mappings:
+    #   conll2003:
+    #     B-LOC: B-ADDR
+    #     I-LOC: I-ADDR
+    
+    # Unified label schema
+    unified_labels:
+      - "O"
+      - "B-PER"
+      - "I-PER"
+      - "B-ORG"
+      - "I-ORG"
+      - "B-ADDR"
+      - "I-ADDR"
+      # ... more labels
+    
+    filter_english: true                    # Filter non-English examples
+    max_samples_per_dataset: null           # Limit samples per dataset
   
   # Tokenization settings
   max_length: 256                           # Maximum sequence length
@@ -112,17 +134,17 @@ data:
   stride: 128                               # Stride for long sequences
   truncation_strategy: "longest_first"      # How to truncate long sequences
   
-  # Label configuration
-  label_names:
-    - "O"
-    - "B-PER"
-    - "I-PER"
-    - "B-ORG"
-    - "I-ORG"
-    - "B-LOC"
-    - "I-LOC"
-    - "B-MISC"
-    - "I-MISC"
+  # Label configuration (for single dataset mode)
+  # label_names:
+  #   - "O"
+  #   - "B-PER"
+  #   - "I-PER"
+  #   - "B-ORG"
+  #   - "I-ORG"
+  #   - "B-LOC"
+  #   - "I-LOC"
+  #   - "B-MISC"
+  #   - "I-MISC"
   
   # Processing settings
   preprocessing_num_workers: 4              # Parallel preprocessing workers

@@ -42,7 +42,7 @@ class TestCreateBnbConfig:
         mock_config = Mock()
         mock_bnb_config.return_value = mock_config
 
-        config = create_bnb_config(load_in_8bit=True)
+        config = create_bnb_config(load_in_8bit=True, load_in_4bit=False)
 
         assert config == mock_config
         mock_bnb_config.assert_called_once_with(

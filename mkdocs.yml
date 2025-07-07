@@ -12,7 +12,6 @@ copyright: Copyright &copy; 2024 Sergei Nevedomski
 # Configuration
 theme:
   name: material
-  custom_dir: docs/overrides
   features:
     - announce.dismiss
     - content.action.edit

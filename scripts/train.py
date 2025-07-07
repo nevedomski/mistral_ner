@@ -110,10 +110,18 @@ def main() -> None:
         logger.info(f"GPU memory status: {gpu_info}")
 
     try:
-        # Load dataset
-        logger.info("Loading dataset...")
-        dataset = load_conll2003_dataset()
-        print_dataset_statistics(dataset)
+        # Check if multi-dataset mode is enabled
+        dataset = None
+        if config.data.multi_dataset.enabled:
+            logger.info("Multi-dataset mode enabled. Will load multiple datasets...")
+            logger.info(f"Datasets to load: {config.data.multi_dataset.dataset_names}")
+            logger.info(f"Mixing strategy: {config.data.multi_dataset.mixing_strategy}")
+            logger.info(f"Dataset weights: {config.data.multi_dataset.dataset_weights}")
+        else:
+            # Load single dataset
+            logger.info("Loading dataset...")
+            dataset = load_conll2003_dataset()
+            print_dataset_statistics(dataset)
 
         # Setup model and tokenizer
         logger.info("Setting up model and tokenizer...")
