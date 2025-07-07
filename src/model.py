@@ -29,15 +29,16 @@ def create_bnb_config(load_in_8bit: bool = False, load_in_4bit: bool = True) -> 
     # Check if bitsandbytes is available
     try:
         import bitsandbytes as bnb
+
         logger.info(f"BitsAndBytes version: {bnb.__version__}")
     except ImportError:
         logger.error("BitsAndBytes library not installed. Please install with: pip install bitsandbytes")
         logger.warning("Falling back to full precision model")
         return None
-    
+
     # Log the configuration being used
     logger.info(f"Quantization config: load_in_8bit={load_in_8bit}, load_in_4bit={load_in_4bit}")
-    
+
     if load_in_8bit and not load_in_4bit:
         bnb_config = BitsAndBytesConfig(
             load_in_8bit=True,
@@ -129,7 +130,9 @@ def load_base_model(model_name: str, config: Config, bnb_config: BitsAndBytesCon
             model_kwargs["quantization_config"] = bnb_config
             model_kwargs["device_map"] = config.model.device_map
             logger.info(f"Loading model with quantization: {type(bnb_config).__name__}")
-            logger.info(f"Quantization details: 8-bit={getattr(bnb_config, 'load_in_8bit', False)}, 4-bit={getattr(bnb_config, 'load_in_4bit', False)}")
+            logger.info(
+                f"Quantization details: 8-bit={getattr(bnb_config, 'load_in_8bit', False)}, 4-bit={getattr(bnb_config, 'load_in_4bit', False)}"
+            )
         else:
             logger.info("Loading model without quantization (full precision)")
 

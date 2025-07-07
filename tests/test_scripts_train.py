@@ -163,6 +163,7 @@ class TestMain:
         mock_config.logging.log_dir = "./logs"
         mock_config.model.model_name = "test-model"
         mock_config.data.label_names = ["O", "B-PER"]
+        mock_config.data.multi_dataset.enabled = False  # Single dataset mode
         mock_config.training.per_device_eval_batch_size = 8
         # Ensure hyperopt is disabled in the mock
         mock_config.hyperopt.enabled = False

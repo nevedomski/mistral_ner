@@ -117,7 +117,7 @@ class GretelPIIDataset(BaseNERDataset):
 
         return DatasetDict(converted_splits)
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping for Gretel PII types to unified schema."""
         return {
             "O": "O",
@@ -137,7 +137,7 @@ class GretelPIIDataset(BaseNERDataset):
             "I-SWIFT": "I-BANK",
             "B-ROUTING_NUMBER": "B-BANK",  # Add routing number mapping
             "I-ROUTING_NUMBER": "I-BANK",
-            "B-ACCOUNT_NUMBER": "B-BANK",   # Add account number mapping
+            "B-ACCOUNT_NUMBER": "B-BANK",  # Add account number mapping
             "I-ACCOUNT_NUMBER": "I-BANK",
             # Government IDs
             "B-SSN": "B-SSN",
@@ -159,7 +159,7 @@ class GretelPIIDataset(BaseNERDataset):
             "B-CITY": "B-ADDR",
             "I-CITY": "I-ADDR",
             "B-STATE": "B-ADDR",
-            "I-STATE": "I-ADDR", 
+            "I-STATE": "I-ADDR",
             "B-COUNTRY": "B-ADDR",
             "I-COUNTRY": "I-ADDR",
             "B-ZIPCODE": "B-ADDR",

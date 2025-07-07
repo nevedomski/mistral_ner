@@ -49,12 +49,9 @@ mkdir -p wandb_logs
 echo "Starting training..."
 echo ""
 
-python scripts/train.py \
+if python scripts/train.py \
     --config configs/bank_pii.yaml \
-    "$@"  # Pass any additional arguments
-
-# Check if training completed successfully
-if [ $? -eq 0 ]; then
+    "$@"; then  # Pass any additional arguments
     echo ""
     echo "=================================================="
     echo "Training completed successfully!"

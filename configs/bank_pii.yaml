@@ -58,6 +58,16 @@ data:
     # Limit samples for memory management if needed
     # max_samples_per_dataset: 50000
     
+    # Label mapping configuration - use the bank_pii profile
+    label_mapping_profile: "bank_pii"
+    
+    # Alternative: specify individual mapping files
+    # label_mappings:
+    #   conll2003: "conll2003_bank_pii.yaml"
+    #   ontonotes: "ontonotes_bank_pii.yaml"
+    #   gretel_pii: "gretel_pii_bank.yaml" 
+    #   ai4privacy: "ai4privacy_bank_pii.yaml"
+    
     # Simplified unified labels for bank PII use case
     unified_labels: [
       "O",

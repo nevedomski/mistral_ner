@@ -1,0 +1,53 @@
+# OntoNotes label mapping for bank PII use case
+# Maps all location entities (LOC, GPE, FAC) to ADDR
+# Drops irrelevant entities
+
+O: O
+
+# Person
+B-PERSON: B-PER
+I-PERSON: I-PER
+
+# Organizations
+B-ORG: B-ORG
+I-ORG: I-ORG
+
+# Locations - all map to ADDR for bank PII
+B-LOC: B-ADDR
+I-LOC: I-ADDR
+B-GPE: B-ADDR  # Cities, countries -> address info
+I-GPE: I-ADDR
+B-FAC: B-ADDR  # Facilities -> address info
+I-FAC: I-ADDR
+
+# Temporal
+B-DATE: B-DATE
+I-DATE: I-DATE
+B-TIME: B-TIME
+I-TIME: I-TIME
+
+# Numeric
+B-MONEY: B-MONEY
+I-MONEY: I-MONEY
+B-PERCENT: B-PERCENT
+I-PERCENT: I-PERCENT
+B-QUANTITY: O  # Not relevant for bank PII
+I-QUANTITY: O
+B-ORDINAL: O   # Not relevant for bank PII
+I-ORDINAL: O
+B-CARDINAL: O  # Not relevant for bank PII
+I-CARDINAL: O
+
+# Other
+B-NORP: B-MISC  # Nationalities -> misc PII
+I-NORP: I-MISC
+B-PRODUCT: B-MISC  # Products -> misc
+I-PRODUCT: I-MISC
+B-EVENT: O     # Not relevant for bank PII
+I-EVENT: O
+B-WORK_OF_ART: O  # Not relevant for bank PII
+I-WORK_OF_ART: O
+B-LAW: O       # Not relevant for bank PII
+I-LAW: O
+B-LANGUAGE: O  # Not relevant for bank PII
+I-LANGUAGE: O

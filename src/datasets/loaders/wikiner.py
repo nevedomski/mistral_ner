@@ -53,7 +53,7 @@ class WikiNERDataset(BaseNERDataset):
             logger.error(f"Failed to load WikiNER dataset: {e}")
             raise
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping from WikiNER to unified schema.
 
         WikiNER uses IOB2 format with tags:

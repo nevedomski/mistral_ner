@@ -19,7 +19,7 @@ class TestBaseNERDataset:
             def load(self):
                 return DatasetDict()
 
-            def get_label_mapping(self):
+            def get_default_label_mapping(self):
                 return {}
 
             def preprocess(self, examples):
@@ -46,7 +46,7 @@ class TestBaseNERDataset:
             def load(self):
                 return DatasetDict()
 
-            def get_label_mapping(self):
+            def get_default_label_mapping(self):
                 return {}
 
             def preprocess(self, examples):
@@ -70,7 +70,7 @@ class TestBaseNERDataset:
             def load(self):
                 return DatasetDict()
 
-            def get_label_mapping(self):
+            def get_default_label_mapping(self):
                 return {}
 
             def preprocess(self, examples):
@@ -91,7 +91,7 @@ class TestBaseNERDataset:
             def load(self):
                 return DatasetDict()
 
-            def get_label_mapping(self):
+            def get_default_label_mapping(self):
                 return {}
 
             def preprocess(self, examples):
@@ -115,7 +115,7 @@ class TestBaseNERDataset:
             def load(self):
                 return DatasetDict()
 
-            def get_label_mapping(self):
+            def get_default_label_mapping(self):
                 return {}
 
             def preprocess(self, examples):
@@ -161,7 +161,7 @@ class TestDatasetRegistry:
             def load(self):
                 return DatasetDict()
 
-            def get_label_mapping(self):
+            def get_default_label_mapping(self):
                 return {}
 
             def preprocess(self, examples):

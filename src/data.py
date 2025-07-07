@@ -279,16 +279,27 @@ def prepare_multi_datasets(
     for i, dataset_name in enumerate(dataset_names):
         logger.info(f"Loading dataset {i + 1}/{len(dataset_names)}: {dataset_name}")
 
-        # Get dataset-specific config if needed
-        dataset_config = {
+        # Get dataset-specific config
+        dataset_config: dict[str, Any] = {
             "language": (config.data.multi_dataset.filter_english and "English") or None,
+            "dataset_name": dataset_name,  # Used for profile lookup
         }
 
-        # Load dataset
+        # Add label mapping configuration if available
+        if config.data.multi_dataset.label_mapping_profile:
+            # Use profile-based mapping
+            dataset_config["label_mapping"] = f"profile:{config.data.multi_dataset.label_mapping_profile}"
+        elif dataset_name in config.data.multi_dataset.label_mappings:
+            # Use dataset-specific mapping from config
+            mapping = config.data.multi_dataset.label_mappings[dataset_name]
+            # mapping can be either a dict or a string (file path)
+            dataset_config["label_mapping"] = mapping
+
+        # Load dataset with config
         loader = registry.get_loader(dataset_name, dataset_config)
         dataset = loader.load()
 
-        # Get label mapping for this dataset
+        # Get label mapping for this dataset (will use config if provided)
         label_mapping = loader.get_label_mapping()
 
         # Apply label mapping to unify schema

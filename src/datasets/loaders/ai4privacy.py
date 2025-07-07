@@ -59,7 +59,7 @@ class AI4PrivacyDataset(BaseNERDataset):
             logger.error(f"Failed to load AI4Privacy dataset: {e}")
             raise
 
-    def get_label_mapping(self) -> dict[str, str]:
+    def get_default_label_mapping(self) -> dict[str, str]:
         """Get label mapping from AI4Privacy to unified schema.
 
         AI4Privacy has many PII entity types that map to our unified schema.

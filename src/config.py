@@ -57,6 +57,10 @@ class MultiDatasetConfig:
     filter_english: bool = True  # For multilingual datasets
     max_samples_per_dataset: int | None = None  # For memory management
 
+    # Label mapping configuration
+    label_mapping_profile: str | None = None  # Use a predefined profile (e.g., "bank_pii", "general")
+    label_mappings: dict[str, dict[str, str] | str] = field(default_factory=dict)  # Per-dataset mappings
+
     # Unified label schema - comprehensive set covering all datasets
     unified_labels: list[str] = field(
         default_factory=lambda: [
