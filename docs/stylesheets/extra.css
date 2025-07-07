@@ -1,0 +1,251 @@
+/* Custom styles for Mistral NER documentation */
+
+/* Badge styling */
+img[src*="shields.io"] {
+  display: inline-block !important;
+  vertical-align: middle;
+  margin: 0.2rem;
+  max-width: none !important;
+  height: auto;
+}
+
+/* Center aligned div for badges */
+div[align="center"] {
+  text-align: center;
+}
+
+div[align="center"] img {
+  display: inline-block !important;
+  margin: 0.3rem;
+  vertical-align: middle;
+}
+
+div[align="center"] a {
+  text-decoration: none;
+  display: inline-block;
+  margin: 0 0.2rem;
+}
+
+/* Custom grid cards */
+.grid.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.grid.cards > * {
+  background: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 0.2rem 0.5rem rgba(0,0,0,.05), 0 0 0.05rem rgba(0,0,0,.1);
+  transition: all 0.3s;
+}
+
+.grid.cards > *:hover {
+  box-shadow: 0 0.4rem 1rem rgba(0,0,0,.1), 0 0 0.1rem rgba(0,0,0,.2);
+  transform: translateY(-2px);
+}
+
+/* Mathematical formulas */
+.arithmatex {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+/* Code blocks with line numbers */
+.highlight {
+  position: relative;
+}
+
+.highlight .filename {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--md-code-bg-color);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 0 0 0 0.2rem;
+  opacity: 0.7;
+}
+
+/* Admonition enhancements */
+.admonition {
+  margin: 1.5rem 0;
+}
+
+.admonition.performance {
+  border-left-color: #ff9800;
+}
+
+.admonition.performance > .admonition-title {
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+.admonition.performance > .admonition-title::before {
+  content: "📊";
+  margin-right: 0.5rem;
+}
+
+/* Table enhancements */
+.md-typeset table {
+  font-size: 0.9rem;
+}
+
+.md-typeset table th {
+  background-color: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+  font-weight: 600;
+}
+
+.md-typeset table tr:hover {
+  background-color: var(--md-default-fg-color--lightest);
+}
+
+/* API endpoint styling */
+.api-endpoint {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0.25rem;
+  font-family: var(--md-code-font-family);
+  background-color: var(--md-code-bg-color);
+}
+
+.api-method {
+  font-weight: bold;
+  margin-right: 1rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.2rem;
+  color: white;
+}
+
+.api-method.get { background-color: #61affe; }
+.api-method.post { background-color: #49cc90; }
+.api-method.put { background-color: #fca130; }
+.api-method.delete { background-color: #f93e3e; }
+
+/* Parameter tables */
+.parameter-table {
+  font-size: 0.85rem;
+}
+
+.parameter-table .param-name {
+  font-family: var(--md-code-font-family);
+  font-weight: 600;
+  color: var(--md-primary-fg-color);
+}
+
+.parameter-table .param-type {
+  font-family: var(--md-code-font-family);
+  color: var(--md-code-hl-keyword-color);
+  font-size: 0.8rem;
+}
+
+.parameter-table .param-required {
+  color: #f93e3e;
+  font-weight: bold;
+}
+
+/* Benchmark charts */
+.benchmark-chart {
+  margin: 2rem 0;
+  padding: 1rem;
+  background: var(--md-default-bg-color);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.2rem 0.5rem rgba(0,0,0,.05);
+}
+
+/* Loss function comparison */
+.loss-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.loss-card {
+  padding: 1rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.5rem;
+  background: var(--md-default-bg-color);
+}
+
+.loss-card h4 {
+  margin-top: 0;
+  color: var(--md-primary-fg-color);
+}
+
+.loss-formula {
+  background: var(--md-code-bg-color);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+/* Dataset catalog styling */
+.dataset-card {
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  background: var(--md-default-bg-color);
+}
+
+.dataset-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 0.5rem;
+  background: var(--md-code-bg-color);
+  border-radius: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--md-primary-fg-color);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--md-default-fg-color--light);
+}
+
+/* Interactive elements */
+.interactive-demo {
+  border: 2px dashed var(--md-primary-fg-color);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 2rem 0;
+  text-align: center;
+  background: var(--md-default-bg-color);
+}
+
+/* Footer enhancement */
+.md-footer-meta {
+  background-color: var(--md-default-fg-color--lightest);
+}
+
+/* Mobile responsiveness */
+@media screen and (max-width: 768px) {
+  .grid.cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .loss-comparison {
+    grid-template-columns: 1fr;
+  }
+  
+  .dataset-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+}

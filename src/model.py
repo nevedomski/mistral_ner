@@ -24,9 +24,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger("mistral_ner")
 
 
-def create_bnb_config(load_in_8bit: bool = False, load_in_4bit: bool = True) -> BitsAndBytesConfig:
+def create_bnb_config(load_in_8bit: bool = False, load_in_4bit: bool = True) -> BitsAndBytesConfig | None:
     """Create BitsAndBytes configuration for model quantization."""
-    if load_in_8bit:
+    # Check if bitsandbytes is available
+    try:
+        import bitsandbytes as bnb
+        logger.info(f"BitsAndBytes version: {bnb.__version__}")
+    except ImportError:
+        logger.error("BitsAndBytes library not installed. Please install with: pip install bitsandbytes")
+        logger.warning("Falling back to full precision model")
+        return None
+    
+    # Log the configuration being used
+    logger.info(f"Quantization config: load_in_8bit={load_in_8bit}, load_in_4bit={load_in_4bit}")
+    
+    if load_in_8bit and not load_in_4bit:
         bnb_config = BitsAndBytesConfig(
             load_in_8bit=True,
             bnb_8bit_compute_dtype=torch.float16,
@@ -34,7 +46,7 @@ def create_bnb_config(load_in_8bit: bool = False, load_in_4bit: bool = True) -> 
             bnb_8bit_use_double_quant=True,
         )
         logger.info("Created 8-bit quantization config")
-    elif load_in_4bit:
+    elif load_in_4bit and not load_in_8bit:
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
@@ -42,6 +54,14 @@ def create_bnb_config(load_in_8bit: bool = False, load_in_4bit: bool = True) -> 
             bnb_4bit_use_double_quant=True,
         )
         logger.info("Created 4-bit quantization config (QLoRA)")
+    elif load_in_8bit and load_in_4bit:
+        logger.warning("Both 8-bit and 4-bit quantization requested. Using 4-bit as it's more memory efficient.")
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
     else:
         # No quantization
         bnb_config = None
@@ -108,6 +128,10 @@ def load_base_model(model_name: str, config: Config, bnb_config: BitsAndBytesCon
         if bnb_config is not None:
             model_kwargs["quantization_config"] = bnb_config
             model_kwargs["device_map"] = config.model.device_map
+            logger.info(f"Loading model with quantization: {type(bnb_config).__name__}")
+            logger.info(f"Quantization details: 8-bit={getattr(bnb_config, 'load_in_8bit', False)}, 4-bit={getattr(bnb_config, 'load_in_4bit', False)}")
+        else:
+            logger.info("Loading model without quantization (full precision)")
 
         # Handle potential out of memory errors
         try:

@@ -1,0 +1,100 @@
+# Configuration for 8-bit quantization training
+# This uses 8-bit quantization instead of the default 4-bit QLoRA
+
+model:
+  model_name: "mistralai/Mistral-7B-v0.3"
+  num_labels: 9
+  load_in_8bit: true    # Enable 8-bit quantization
+  load_in_4bit: false   # Disable 4-bit quantization
+  device_map: "auto"
+  trust_remote_code: true
+  use_cache: false
+  
+  # LoRA configuration - Can use higher rank with 8-bit
+  lora_r: 64  # Higher rank possible with 8-bit
+  lora_alpha: 128  # 2x rank
+  lora_dropout: 0.1
+  lora_bias: "none"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  task_type: "TOKEN_CLS"
+
+data:
+  dataset_name: "conll2003"
+  max_length: 256
+  label_all_tokens: false
+  return_entity_level_metrics: true
+  
+  label_names:
+    - "O"
+    - "B-PER"
+    - "I-PER"
+    - "B-ORG"
+    - "I-ORG"
+    - "B-LOC"
+    - "I-LOC"
+    - "B-MISC"
+    - "I-MISC"
+
+training:
+  output_dir: "./mistral-ner-8bit"
+  final_output_dir: "./mistral-ner-8bit-final"
+  num_train_epochs: 5
+  per_device_train_batch_size: 8  # Can use larger batch with 8-bit
+  per_device_eval_batch_size: 16
+  gradient_accumulation_steps: 4
+  gradient_checkpointing: true
+  optim: "paged_adamw_32bit"
+  learning_rate: 0.0002
+  weight_decay: 0.001
+  warmup_ratio: 0.03
+  max_grad_norm: 1.0
+  
+  # Loss function
+  loss_type: "focal"
+  focal_alpha: null
+  focal_gamma: 2.0
+  
+  # Training strategy
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  logging_steps: 10
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1"
+  greater_is_better: true
+  
+  # Mixed precision
+  fp16: true
+  bf16: false
+  tf32: true
+  
+  # Early stopping
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.01
+  
+  # Memory management
+  clear_cache_steps: 50
+  
+  # Seed
+  seed: 42
+
+logging:
+  log_level: "info"
+  log_dir: "./logs"
+  disable_tqdm: false
+  
+  # WandB configuration
+  use_wandb: true
+  wandb_project: "mistral-ner-8bit"
+  wandb_entity: null
+  wandb_name: "8bit-quantization-run"
+  wandb_tags: ["8bit", "quantization", "mistral"]
+  wandb_mode: "online"
+  wandb_dir: "./wandb_logs"

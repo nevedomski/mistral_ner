@@ -3,8 +3,12 @@
 model:
   model_name: "mistralai/Mistral-7B-v0.3"
   num_labels: 9
-  load_in_8bit: false   # Disabled 8-bit quantization
-  load_in_4bit: true    # Enabled 4-bit quantization (QLoRA)
+  # Quantization settings - Choose one:
+  # - 8-bit: Better performance, ~10GB VRAM usage
+  # - 4-bit: More memory efficient, ~6GB VRAM usage
+  # - Both false: Full precision, ~24GB VRAM usage
+  load_in_8bit: false   # Set to true for 8-bit quantization
+  load_in_4bit: true    # Set to true for 4-bit quantization (QLoRA) - DEFAULT
   device_map: "auto"
   trust_remote_code: true
   use_cache: false
