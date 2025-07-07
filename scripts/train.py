@@ -37,6 +37,10 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--no-load-in-8bit", dest="load_in_8bit", action="store_false", help="Don't load model in 8-bit"
     )
+    parser.add_argument("--load-in-4bit", action="store_true", help="Load model in 4-bit (overrides config)")
+    parser.add_argument(
+        "--no-load-in-4bit", dest="load_in_4bit", action="store_false", help="Don't load model in 4-bit"
+    )
 
     # Data arguments
     parser.add_argument("--max-length", type=int, help="Maximum sequence length (overrides config)")
@@ -75,7 +79,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--test", action="store_true", help="Run evaluation on test set after training")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
-    parser.set_defaults(load_in_8bit=None, use_wandb=None)
+    parser.set_defaults(load_in_8bit=None, load_in_4bit=None, use_wandb=None)
 
     return parser.parse_args()
 

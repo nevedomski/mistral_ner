@@ -373,8 +373,10 @@ class Config:
         # Update model config
         if hasattr(args, "model_name") and args.model_name:
             self.model.model_name = args.model_name
-        if hasattr(args, "load_in_8bit"):
+        if hasattr(args, "load_in_8bit") and args.load_in_8bit is not None:
             self.model.load_in_8bit = args.load_in_8bit
+        if hasattr(args, "load_in_4bit") and args.load_in_4bit is not None:
+            self.model.load_in_4bit = args.load_in_4bit
 
         # Update data config
         if hasattr(args, "max_length") and args.max_length:
