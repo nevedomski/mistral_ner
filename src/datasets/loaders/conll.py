@@ -54,8 +54,8 @@ class CoNLLDataset(BaseNERDataset):
             "I-PER": "I-PER",
             "B-ORG": "B-ORG",
             "I-ORG": "I-ORG",
-            "B-LOC": "B-LOC",
-            "I-LOC": "I-LOC",
+            "B-LOC": "B-ADDR",  # Map locations to addresses for bank PII
+            "I-LOC": "I-ADDR",  # Map locations to addresses for bank PII
             "B-MISC": "B-MISC",
             "I-MISC": "I-MISC",
         }

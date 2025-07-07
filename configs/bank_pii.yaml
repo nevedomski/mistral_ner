@@ -1,0 +1,155 @@
+# Bank Call Transcript PII Detection Configuration
+# Optimized for identifying PII in banking conversations
+# Uses 4 datasets: CoNLL-2003, OntoNotes, Gretel PII, AI4Privacy
+
+model:
+  model_name: "mistralai/Mistral-7B-v0.3"
+  num_labels: 33  # 16 entity types in BIO format + O tag
+  load_in_8bit: false
+  load_in_4bit: true  # QLoRA for memory efficiency
+  device_map: "auto"
+  trust_remote_code: true
+  use_cache: false
+  
+  # LoRA configuration - optimized for PII detection
+  lora_r: 32
+  lora_alpha: 64
+  lora_dropout: 0.1
+  lora_bias: "none"
+  target_modules: 
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  task_type: "TOKEN_CLS"
+
+data:
+  # Single dataset mode disabled
+  dataset_name: "conll2003"  # Ignored when multi_dataset.enabled = true
+  max_length: 256  # Suitable for call transcript segments
+  label_all_tokens: false
+  return_entity_level_metrics: true
+  
+  # Multi-dataset configuration
+  multi_dataset:
+    enabled: true
+    
+    # Selected datasets for comprehensive PII coverage
+    dataset_names: [
+      "conll2003",      # General NER baseline
+      "ontonotes",      # Comprehensive entities (MONEY, DATE, ORG)
+      "gretel_pii",     # Financial PII focus
+      "ai4privacy"      # Extensive PII types
+    ]
+    
+    # Weights optimized for PII detection
+    # Higher weights for PII-specific datasets
+    dataset_weights: [0.15, 0.25, 0.3, 0.3]
+    
+    # Interleave for balanced exposure
+    mixing_strategy: "interleave"
+    
+    # English only for bank calls
+    filter_english: true
+    
+    # Limit samples for memory management if needed
+    # max_samples_per_dataset: 50000
+    
+    # Simplified unified labels for bank PII use case
+    unified_labels: [
+      "O",
+      # Personal information
+      "B-PER", "I-PER",          # Person names
+      "B-ORG", "I-ORG",          # Organizations, companies, banks
+      "B-ADDR", "I-ADDR",        # All location info (addresses, cities, states, countries)
+      
+      # Financial identifiers
+      "B-CARD", "I-CARD",        # Credit/debit card numbers
+      "B-BANK", "I-BANK",        # Bank accounts, routing numbers, IBAN, SWIFT
+      "B-MONEY", "I-MONEY",      # Monetary amounts, transactions
+      
+      # Contact information
+      "B-EMAIL", "I-EMAIL",      # Email addresses
+      "B-PHONE", "I-PHONE",      # Phone numbers
+      
+      # Government IDs
+      "B-SSN", "I-SSN",          # Social Security Numbers
+      "B-LICENSE", "I-LICENSE",  # Driver's licenses
+      "B-PASSPORT", "I-PASSPORT", # Passport numbers
+      
+      # Temporal and other
+      "B-DATE", "I-DATE",        # Dates, DOB
+      "B-TIME", "I-TIME",        # Time references
+      "B-PERCENT", "I-PERCENT",  # Interest rates, percentages
+      "B-MISC", "I-MISC"         # Other sensitive info (usernames, IPs, etc.)
+    ]
+
+training:
+  output_dir: "./mistral-ner-bank-pii"
+  final_output_dir: "./mistral-ner-bank-pii-final"
+  num_train_epochs: 5
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  optim: "paged_adamw_32bit"
+  learning_rate: 0.0002
+  weight_decay: 0.001
+  warmup_ratio: 0.03
+  max_grad_norm: 1.0
+  
+  # Loss function - focal loss for imbalanced PII classes
+  loss_type: "focal"
+  focal_alpha: null  # Auto-computed from class frequencies
+  focal_gamma: 2.0
+  
+  # Learning rate scheduling
+  lr_scheduler_type: "cosine"
+  
+  # Evaluation and saving
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  logging_steps: 10
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1"
+  greater_is_better: true
+  report_to: ["wandb"]
+  
+  # Mixed precision
+  fp16: false
+  bf16: false
+  tf32: true
+  
+  # Early stopping
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.01
+  
+  # Memory management
+  clear_cache_steps: 50
+  
+  # Seed for reproducibility
+  seed: 42
+  data_seed: 42
+  
+  # Hub configuration
+  push_to_hub: false
+  hub_model_id: null
+
+logging:
+  log_level: "info"
+  log_dir: "./logs/bank_pii"
+  disable_tqdm: false
+  
+  # WandB configuration
+  use_wandb: true
+  wandb_project: "mistral-ner-bank-pii"
+  wandb_entity: null
+  wandb_name: null
+  wandb_tags: ["bank-pii", "multi-dataset", "financial", "pii-detection"]
+  wandb_notes: "Mistral-7B fine-tuned for PII detection in bank call transcripts"
+  wandb_mode: "online"
+  wandb_dir: "./wandb_logs"

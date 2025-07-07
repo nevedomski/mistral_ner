@@ -70,13 +70,13 @@ class OntoNotesDataset(BaseNERDataset):
             # Organizations
             "B-ORG": "B-ORG",
             "I-ORG": "I-ORG",
-            # Locations
-            "B-LOC": "B-LOC",
-            "I-LOC": "I-LOC",
-            "B-GPE": "B-GPE",  # Geo-political entities (cities, countries)
-            "I-GPE": "I-GPE",
-            "B-FAC": "B-FAC",  # Facilities
-            "I-FAC": "I-FAC",
+            # Locations - all map to ADDR for bank PII
+            "B-LOC": "B-ADDR",
+            "I-LOC": "I-ADDR",
+            "B-GPE": "B-ADDR",  # Cities, countries -> address info
+            "I-GPE": "I-ADDR",
+            "B-FAC": "B-ADDR",  # Facilities -> address info
+            "I-FAC": "I-ADDR",
             # Temporal
             "B-DATE": "B-DATE",
             "I-DATE": "I-DATE",
@@ -87,25 +87,25 @@ class OntoNotesDataset(BaseNERDataset):
             "I-MONEY": "I-MONEY",
             "B-PERCENT": "B-PERCENT",
             "I-PERCENT": "I-PERCENT",
-            "B-QUANTITY": "B-QUANT",
-            "I-QUANTITY": "I-QUANT",
-            "B-ORDINAL": "B-ORD",
-            "I-ORDINAL": "I-ORD",
-            "B-CARDINAL": "B-CARD_NUM",
-            "I-CARDINAL": "I-CARD_NUM",
+            "B-QUANTITY": "O",  # Not relevant for bank PII
+            "I-QUANTITY": "O",
+            "B-ORDINAL": "O",   # Not relevant for bank PII
+            "I-ORDINAL": "O",
+            "B-CARDINAL": "O",  # Not relevant for bank PII
+            "I-CARDINAL": "O",
             # Other
-            "B-NORP": "B-NORP",  # Nationalities, religious, political groups
-            "I-NORP": "I-NORP",
-            "B-PRODUCT": "B-PROD",
-            "I-PRODUCT": "I-PROD",
-            "B-EVENT": "B-EVENT",
-            "I-EVENT": "I-EVENT",
-            "B-WORK_OF_ART": "B-ART",
-            "I-WORK_OF_ART": "I-ART",
-            "B-LAW": "B-LAW",
-            "I-LAW": "I-LAW",
-            "B-LANGUAGE": "B-LANG",
-            "I-LANGUAGE": "I-LANG",
+            "B-NORP": "B-MISC",  # Nationalities -> misc PII
+            "I-NORP": "I-MISC",
+            "B-PRODUCT": "B-MISC",  # Products -> misc (or could be ORG)
+            "I-PRODUCT": "I-MISC",
+            "B-EVENT": "O",     # Not relevant for bank PII
+            "I-EVENT": "O",
+            "B-WORK_OF_ART": "O",  # Not relevant for bank PII
+            "I-WORK_OF_ART": "O",
+            "B-LAW": "O",       # Not relevant for bank PII
+            "I-LAW": "O",
+            "B-LANGUAGE": "O",  # Not relevant for bank PII
+            "I-LANGUAGE": "O",
         }
 
     def preprocess(self, examples: dict[str, Any]) -> dict[str, Any]:
