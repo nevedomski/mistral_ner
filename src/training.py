@@ -48,8 +48,14 @@ class MemoryCallback(TrainerCallback):
         """Clear cache periodically to prevent OOM."""
         if state.global_step % self.clear_cache_steps == 0:
             clear_gpu_cache()
-            memory_stats = check_gpu_memory()
-            logger.debug(f"Step {state.global_step} - GPU Memory: {memory_stats}")
+            gpu_info = check_gpu_memory()
+            logger.debug(f"Step {state.global_step}: {gpu_info}")
+
+    def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs: Any) -> None:
+        """Log GPU memory usage."""
+        if state.global_step % args.logging_steps == 0:
+            gpu_info = check_gpu_memory()
+            logger.info(f"GPU memory: {gpu_info}")
 
     def on_epoch_end(
         self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs: Any
@@ -59,28 +65,27 @@ class MemoryCallback(TrainerCallback):
 
 
 class CustomWandbCallback(WandbCallback):
-    """Custom WandB callback with additional logging."""
+    """Custom WandB callback with additional features."""
 
     def on_log(
         self,
         args: TrainingArguments,
         state: TrainerState,
         control: TrainerControl,
-        model: PreTrainedModel | None = None,
         logs: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        """Add custom metrics to WandB logs."""
-        if self._wandb is not None and logs is not None:
-            # Add GPU memory stats
-            memory_stats = check_gpu_memory()
-            if "error" not in memory_stats:
-                for gpu_id, stats in memory_stats.items():
-                    if isinstance(stats, dict):
-                        logs[f"gpu/{gpu_id}/memory_used_gb"] = stats["allocated_gb"]
-                        logs[f"gpu/{gpu_id}/memory_util_percent"] = stats["utilization_percent"]
+        """Log additional metrics to WandB."""
+        super().on_log(args, state, control, logs, **kwargs)
 
-        super().on_log(args, state, control, model=model, logs=logs, **kwargs)
+        # Log GPU metrics if available
+        if logs and self._wandb is not None:
+            gpu_info = check_gpu_memory()
+            # Add GPU stats to logs for each GPU
+            for gpu_id, stats in gpu_info.items():
+                if isinstance(stats, dict) and "allocated_gb" in stats:
+                    logs[f"gpu/{gpu_id}/memory_used_gb"] = stats["allocated_gb"]
+                    logs[f"gpu/{gpu_id}/memory_util_percent"] = stats.get("utilization_percent", 0)
 
 
 class ConfigSaveCallback(TrainerCallback):
@@ -260,7 +265,7 @@ class TrainingManager:
             # Log metrics
             logger.info(f"Training completed. Metrics: {train_result.metrics}")
 
-            # Save final model
+            # Save final model with adapters
             if self.config.training.final_output_dir:
                 logger.info(f"Saving final model to {self.config.training.final_output_dir}")
                 trainer.save_model(self.config.training.final_output_dir)
@@ -269,6 +274,24 @@ class TrainingManager:
                 config_path = Path(self.config.training.final_output_dir) / "config.yaml"
                 self.config.to_yaml(config_path)
                 logger.info(f"Config saved to final output: {config_path}")
+
+                # Check if we should merge and save the model
+                if getattr(self.config.training, "merge_adapters_on_save", True):
+                    # Save merged model to a separate directory
+                    merged_output_dir = str(
+                        Path(self.config.training.final_output_dir).parent
+                        / f"{Path(self.config.training.final_output_dir).name}-merged"
+                    )
+                    logger.info(f"Merging LoRA adapters and saving to {merged_output_dir}")
+
+                    from .model import merge_and_save_model
+
+                    merge_and_save_model(trainer.model, trainer.tokenizer, merged_output_dir)
+
+                    # Also save config to merged model directory
+                    merged_config_path = Path(merged_output_dir) / "config.yaml"
+                    self.config.to_yaml(merged_config_path)
+                    logger.info(f"Config saved to merged model: {merged_config_path}")
 
             return train_result.metrics  # type: ignore[no-any-return]
 
@@ -304,206 +327,211 @@ class TrainingManager:
 
 
 def create_custom_trainer_class(config: Config, train_dataset: Dataset | None = None) -> type[Trainer]:
-    """Create a custom Trainer class with additional features."""
-
-    # Setup custom loss function if not using standard cross-entropy
-    custom_loss_fn = None
-    if config.training.loss_type != "cross_entropy" or config.training.use_class_weights:
-        logger.info(f"Setting up custom loss function: {config.training.loss_type}")
-        if config.training.use_class_weights:
-            logger.info("Class weighting enabled")
-
-        # Compute class frequencies if needed
-        class_frequencies = None
-        if (
-            config.training.loss_type in ["class_balanced"]
-            or (config.training.loss_type == "focal" and config.training.focal_alpha is None)
-            or config.training.use_class_weights
-        ):
-            if train_dataset is not None:
-                class_frequencies = compute_class_frequencies(train_dataset, "labels")
-            else:
-                logger.warning("No train_dataset provided for class frequency computation")
-
-        # Create loss function with proper type handling
-        if config.training.loss_type == "focal":
-            focal_alpha: float | list[float] | None = config.training.focal_alpha
-            # Auto-compute alpha from class frequencies if not specified
-            if config.training.focal_alpha is None and class_frequencies is not None:
-                # Compute inverse frequency weights
-                total_samples = sum(class_frequencies)
-                alpha_weights = [total_samples / (len(class_frequencies) * freq) for freq in class_frequencies]
-                focal_alpha = alpha_weights
-                logger.info(f"Auto-computed focal loss alpha weights: {alpha_weights}")
-
-            custom_loss_fn = create_loss_function(
-                loss_type=config.training.loss_type,
-                num_labels=config.model.num_labels,
-                gamma=config.training.focal_gamma,
-                alpha=focal_alpha,
-                class_frequencies=class_frequencies,
-                class_weights=config.training.manual_class_weights if config.training.use_class_weights else None,
-                auto_weight=config.training.use_class_weights
-                and config.training.manual_class_weights is None
-                and focal_alpha is None,
-                weight_type=config.training.class_weight_type,
-                class_weight_smoothing=config.training.class_weight_smoothing,
-            )
-        elif config.training.loss_type == "label_smoothing":
-            custom_loss_fn = create_loss_function(
-                loss_type=config.training.loss_type,
-                num_labels=config.model.num_labels,
-                smoothing=config.training.label_smoothing,
-            )
-        elif config.training.loss_type == "class_balanced":
-            if class_frequencies is None:
-                raise ValueError("class_frequencies required for class_balanced loss")
-            custom_loss_fn = create_loss_function(
-                loss_type=config.training.loss_type,
-                num_labels=config.model.num_labels,
-                class_frequencies=class_frequencies,
-                beta=config.training.class_balanced_beta,
-            )
-        elif config.training.loss_type == "weighted_cross_entropy" or (
-            config.training.loss_type == "cross_entropy" and config.training.use_class_weights
-        ):
-            # Handle weighted cross-entropy
-            custom_loss_fn = create_loss_function(
-                loss_type="weighted_cross_entropy",
-                num_labels=config.model.num_labels,
-                class_frequencies=class_frequencies,
-                class_weights=config.training.manual_class_weights,
-                auto_weight=config.training.use_class_weights and config.training.manual_class_weights is None,
-                weight_type=config.training.class_weight_type,
-                class_weight_smoothing=config.training.class_weight_smoothing,
-            )
+    """Create a custom trainer class with custom loss function."""
+    # Compute class frequencies for loss weighting
+    class_frequencies = None
+    if config.training.loss_type in ["focal", "class_balanced"] and config.training.focal_alpha is None:
+        if train_dataset is not None:
+            logger.info("Computing class frequencies for loss weighting...")
+            class_frequencies = compute_class_frequencies(train_dataset)
+            logger.info(f"Class frequencies: {class_frequencies}")
         else:
-            custom_loss_fn = create_loss_function(
-                loss_type=config.training.loss_type,
-                num_labels=config.model.num_labels,
-            )
+            logger.warning("Train dataset not provided, cannot compute class frequencies for loss weighting")
+
+    # Create loss function
+    loss_fn = create_loss_function(
+        loss_type=config.training.loss_type,
+        num_labels=len(config.data.label_names),
+        alpha=config.training.focal_alpha,  # Note: focal_alpha -> alpha
+        gamma=config.training.focal_gamma,  # Note: focal_gamma -> gamma
+        smoothing=config.training.label_smoothing,  # Note: label_smoothing -> smoothing
+        beta=config.training.class_balanced_beta,  # Note: class_balanced_beta -> beta
+        class_frequencies=class_frequencies,
+    )
 
     class CustomTrainer(Trainer):
-        """Custom trainer with enhanced error handling, logging, and focal loss support."""
-
-        def get_train_dataloader(self) -> torch.utils.data.DataLoader:
-            """Override to use custom batch sampler if enabled."""
-            if config.training.use_batch_balancing and train_dataset is not None:
-                from torch.utils.data import DataLoader
-
-                from .batch_balancing import BalancedBatchSampler, BatchCompositionLogger, EntityAwareBatchSampler
-
-                # Create appropriate sampler
-                if config.training.batch_balance_type == "balanced":
-                    batch_sampler = BalancedBatchSampler(
-                        dataset=train_dataset,
-                        batch_size=self.args.per_device_train_batch_size,
-                        min_positive_ratio=config.training.min_positive_ratio,
-                        seed=self.args.seed,
-                    )
-                elif config.training.batch_balance_type == "entity_aware":
-                    batch_sampler = EntityAwareBatchSampler(
-                        dataset=train_dataset,
-                        batch_size=self.args.per_device_train_batch_size,
-                        seed=self.args.seed,
-                    )
-                else:
-                    raise ValueError(f"Unknown batch_balance_type: {config.training.batch_balance_type}")
-
-                # Initialize batch composition logger if enabled
-                if config.training.log_batch_composition:
-                    self.batch_logger = BatchCompositionLogger(log_every_n_batches=config.training.log_batch_every_n)
-
-                # Create dataloader with custom batch sampler
-                return DataLoader(
-                    train_dataset,
-                    batch_sampler=batch_sampler,
-                    collate_fn=self.data_collator,
-                    pin_memory=self.args.dataloader_pin_memory,
-                    num_workers=self.args.dataloader_num_workers,
-                )
-            else:
-                # Use default dataloader
-                return super().get_train_dataloader()
-
-        def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None) -> Any:
-            """Create custom learning rate scheduler."""
-            # Ensure we have an optimizer
-            if optimizer is None:
-                optimizer = self.optimizer
-
-            # For all scheduler types, use our custom scheduler implementation
-            # which properly handles all cases including "linear"
-            scheduler = create_scheduler(
-                optimizer=optimizer,
-                scheduler_type=config.training.lr_scheduler_type,
-                training_args=self.args,
-                num_training_steps=num_training_steps,
-                **config.training.lr_scheduler_kwargs,
-            )
-
-            # Set the scheduler on the trainer to avoid NoneType errors
-            self.lr_scheduler = scheduler
-            return scheduler
+        """Custom trainer with focal loss support."""
 
         def compute_loss(
             self,
             model: PreTrainedModel,
-            inputs: dict[str, Any],
+            inputs: dict[str, torch.Tensor],
             return_outputs: bool = False,
-            num_items_in_batch: int | None = None,
         ) -> torch.Tensor | tuple[torch.Tensor, Any]:
-            """Override compute_loss to use custom loss functions."""
-            try:
-                # Log batch composition if enabled
-                if config.training.log_batch_composition and hasattr(self, "batch_logger"):
-                    labels = inputs.get("labels")
-                    if labels is not None:
-                        self.batch_logger.log_batch(labels)
+            """Compute custom loss."""
+            labels = inputs.pop("labels")
+            outputs = model(**inputs)
+            logits = outputs.logits
 
-                if custom_loss_fn is not None:
-                    # Use custom loss function
-                    labels = inputs.get("labels")
-                    if labels is None:
-                        raise ValueError("No labels found in inputs for custom loss computation")
+            # Reshape for loss computation
+            batch_size, seq_length = labels.shape
+            logits_flat = logits.view(-1, logits.size(-1))
+            labels_flat = labels.view(-1)
 
-                    # Forward pass
-                    outputs = model(**inputs)
-                    logits = outputs.get("logits")
-                    if logits is None:
-                        raise ValueError("No logits found in model outputs")
+            # Compute loss
+            loss = loss_fn(logits_flat, labels_flat)
 
-                    # Compute custom loss
-                    loss = custom_loss_fn(logits, labels)
+            return (loss, outputs) if return_outputs else loss
 
-                    if return_outputs:
-                        return (loss, outputs)
-                    return loss
-                else:
-                    # Use default loss computation
-                    return super().compute_loss(model, inputs, return_outputs, num_items_in_batch)
-
-            except torch.cuda.OutOfMemoryError:
-                logger.error("OOM in compute_loss, clearing cache and retrying...")
-                clear_gpu_cache()
-                # Try with reduced batch
-                for key in ["input_ids", "attention_mask", "labels"]:
-                    if key in inputs and hasattr(inputs[key], "shape"):
-                        batch_size = inputs[key].shape[0]
-                        if batch_size > 1:
-                            # Reduce to half batch size
-                            inputs[key] = inputs[key][: batch_size // 2]
-
-                return super().compute_loss(model, inputs, return_outputs, num_items_in_batch)
+        def create_scheduler(
+            self, num_training_steps: int, optimizer: torch.optim.Optimizer | None = None
+        ) -> torch.optim.lr_scheduler._LRScheduler:
+            """Create custom learning rate scheduler if specified."""
+            if hasattr(config.training, "lr_scheduler_type") and config.training.lr_scheduler_type:
+                if optimizer is None:
+                    optimizer = self.optimizer
+                return create_scheduler(
+                    optimizer=optimizer,
+                    scheduler_type=config.training.lr_scheduler_type,
+                    num_training_steps=num_training_steps,
+                    num_warmup_steps=int(num_training_steps * self.args.warmup_ratio),
+                    **config.training.lr_scheduler_kwargs,
+                )
+            else:
+                # Use default scheduler
+                return super().create_scheduler(num_training_steps, optimizer)
 
         def evaluation_loop(self, *args: Any, **kwargs: Any) -> Any:
-            """Override evaluation loop to add memory management."""
+            """Custom evaluation loop with GPU memory management."""
+            # Clear cache before evaluation
             clear_gpu_cache()
+
+            # Run default evaluation
             result = super().evaluation_loop(*args, **kwargs)
+
+            # Clear cache after evaluation
             clear_gpu_cache()
+
             return result
 
     return CustomTrainer
+
+
+# Multi-dataset support functions
+def create_multi_dataset_trainer_class(config: Config) -> type[Trainer]:
+    """Create a custom trainer class for multi-dataset training."""
+    from .datasets.samplers import DistributedMultiDatasetSampler, MultiDatasetSampler
+
+    class MultiDatasetTrainer(Trainer):
+        """Custom trainer for multi-dataset training."""
+
+        def _get_train_sampler(self) -> MultiDatasetSampler | None:
+            """Get custom sampler for multi-dataset training."""
+            if self.train_dataset is None:
+                return None
+
+            # Extract dataset sizes from the combined dataset
+            # This assumes the dataset was created by MultiDatasetLoader
+            # and contains metadata about individual dataset sizes
+            dataset_sizes = getattr(self.train_dataset, "dataset_sizes", None)
+
+            if dataset_sizes is None:
+                # Fallback: estimate sizes based on total size and number of datasets
+                total_size = len(self.train_dataset)
+                num_datasets = len(config.data.multi_dataset.dataset_names)
+                dataset_sizes = [total_size // num_datasets] * num_datasets
+
+                # Distribute remainder
+                remainder = total_size % num_datasets
+                for i in range(remainder):
+                    dataset_sizes[i] += 1
+
+            # Check if distributed training
+            if self.args.local_rank != -1:
+                return DistributedMultiDatasetSampler(
+                    dataset_sizes=dataset_sizes,
+                    num_replicas=self.args.world_size,
+                    rank=self.args.local_rank,
+                    shuffle=True,
+                    strategy=config.data.multi_dataset.mixing_strategy,
+                    weights=config.data.multi_dataset.dataset_weights,
+                    seed=self.args.seed,
+                    batch_size=self.args.per_device_train_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                )
+            else:
+                return MultiDatasetSampler(
+                    dataset_sizes=dataset_sizes,
+                    strategy=config.data.multi_dataset.mixing_strategy,
+                    weights=config.data.multi_dataset.dataset_weights,
+                    seed=self.args.seed,
+                    batch_size=self.args.per_device_train_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                )
+
+    return MultiDatasetTrainer
+
+
+def create_multi_dataset_trainer(
+    model: PreTrainedModel,
+    tokenizer: PreTrainedTokenizerBase,
+    config: Config,
+) -> tuple[Trainer, Dataset, Dataset]:
+    """
+    Create trainer with multi-dataset support.
+
+    Args:
+        model: The model to train
+        tokenizer: The tokenizer
+        config: Configuration object
+
+    Returns:
+        Tuple of (trainer, train_dataset, eval_dataset)
+    """
+
+    from .data import create_data_collator
+    from .datasets.multi_dataset import MultiDatasetLoader
+
+    # Create multi-dataset loader
+    loader = MultiDatasetLoader(config)
+
+    # Load and prepare datasets
+    train_dataset, eval_dataset = loader.create_train_eval_datasets()
+
+    # Log dataset statistics
+    stats = loader.get_dataset_statistics()
+    logger.info(f"Multi-dataset statistics: {stats}")
+
+    # Store dataset sizes as metadata (for sampler)
+    if hasattr(train_dataset, "_dataset_sizes"):
+        train_dataset.dataset_sizes = train_dataset._dataset_sizes
+    else:
+        # Estimate from loader
+        train_dataset.dataset_sizes = [len(d) for d in loader.datasets]
+
+    # Create data collator
+    data_collator = create_data_collator(tokenizer)
+
+    # Create training manager
+    training_manager = TrainingManager(config)
+
+    # Get the appropriate trainer class
+    if config.data.multi_dataset.mixing_strategy in ["interleave", "weighted"]:
+        # Use custom trainer with multi-dataset sampler
+        CustomTrainerClass = create_multi_dataset_trainer_class(config)
+        trainer = CustomTrainerClass(
+            model=model,
+            args=training_manager.create_training_arguments(),
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            compute_metrics=compute_metrics_factory(config.data.label_names),
+            callbacks=training_manager.create_trainer(
+                model, tokenizer, train_dataset, eval_dataset, data_collator
+            ).callbacks,  # Reuse callbacks
+        )
+    else:
+        # Use standard trainer
+        trainer = training_manager.create_trainer(
+            model=model,
+            tokenizer=tokenizer,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            data_collator=data_collator,
+        )
+
+    return trainer, train_dataset, eval_dataset
 
 
 def run_training_pipeline(

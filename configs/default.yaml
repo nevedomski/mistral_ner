@@ -105,6 +105,9 @@ training:
   push_to_hub: false
   hub_model_id: null
   hub_strategy: "every_save"
+  
+  # Model saving
+  merge_adapters_on_save: true  # Merge LoRA adapters for deployment-ready model
 
 logging:
   log_level: "info"

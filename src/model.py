@@ -89,8 +89,16 @@ def create_lora_config(config: Config) -> LoraConfig:
     return lora_config
 
 
-def load_tokenizer(model_name: str) -> PreTrainedTokenizerBase:
-    """Load and configure tokenizer."""
+def load_tokenizer(model_name: str, max_length: int | None = None) -> PreTrainedTokenizerBase:
+    """Load and configure tokenizer.
+
+    Args:
+        model_name: Name or path of the model
+        max_length: Maximum sequence length from config (optional)
+
+    Returns:
+        Configured tokenizer
+    """
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, add_prefix_space=True)
 
@@ -99,10 +107,11 @@ def load_tokenizer(model_name: str) -> PreTrainedTokenizerBase:
             tokenizer.pad_token = tokenizer.eos_token
             logger.info(f"Set pad_token to eos_token: {tokenizer.pad_token}")
 
-        # Set model max length if not set
+        # Set model max length if not set or unreasonably large
         if tokenizer.model_max_length > 100000:
-            tokenizer.model_max_length = 2048
-            logger.info("Set model_max_length to 2048")
+            # Use config value if provided, otherwise default to 2048
+            tokenizer.model_max_length = max_length if max_length is not None else 2048
+            logger.info(f"Set model_max_length to {tokenizer.model_max_length}")
 
         return tokenizer
 
@@ -115,6 +124,9 @@ def load_base_model(model_name: str, config: Config, bnb_config: BitsAndBytesCon
     """Load the base model with optional quantization."""
     try:
         logger.info(f"Loading base model: {model_name}")
+        logger.info(f"Model config - num_labels: {config.model.num_labels}")
+        logger.info(f"Data config - label_names: {config.data.label_names}")
+        logger.info(f"Multi-dataset enabled: {config.data.multi_dataset.enabled}")
 
         # Model loading arguments
         model_kwargs = {
@@ -138,7 +150,10 @@ def load_base_model(model_name: str, config: Config, bnb_config: BitsAndBytesCon
 
         # Handle potential out of memory errors
         try:
-            model = AutoModelForTokenClassification.from_pretrained(model_name, **model_kwargs)
+            # Add ignore_mismatched_sizes to handle models without token classification heads
+            model = AutoModelForTokenClassification.from_pretrained(
+                model_name, ignore_mismatched_sizes=True, **model_kwargs
+            )
         except torch.cuda.OutOfMemoryError:
             logger.error("CUDA out of memory. Trying to free cache...")
             gc.collect()
@@ -146,7 +161,9 @@ def load_base_model(model_name: str, config: Config, bnb_config: BitsAndBytesCon
 
             # Try again with CPU offloading
             model_kwargs["device_map"] = {"": "cpu", "lm_head": 0, "score": 0}
-            model = AutoModelForTokenClassification.from_pretrained(model_name, **model_kwargs)
+            model = AutoModelForTokenClassification.from_pretrained(
+                model_name, ignore_mismatched_sizes=True, **model_kwargs
+            )
             logger.warning("Model loaded with CPU offloading due to memory constraints")
 
         # Enable gradient checkpointing if specified
@@ -240,8 +257,8 @@ def setup_model(
     if device_map is not None:
         config.model.device_map = device_map
 
-    # Load tokenizer
-    tokenizer = load_tokenizer(model_name)
+    # Load tokenizer with max_length from config
+    tokenizer = load_tokenizer(model_name, max_length=config.data.max_length)
 
     # Create quantization config
     load_in_4bit = getattr(config.model, "load_in_4bit", False)
@@ -301,8 +318,23 @@ def load_model_from_checkpoint(
     try:
         logger.info(f"Loading model from checkpoint: {checkpoint_path}")
 
-        # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+        # Load tokenizer from checkpoint
+        # First try to load from checkpoint, if that fails, load from base model
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+            # Apply same configuration as load_tokenizer
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+                logger.info(f"Set pad_token to eos_token: {tokenizer.pad_token}")
+
+            if tokenizer.model_max_length > 100000:
+                tokenizer.model_max_length = config.data.max_length if hasattr(config.data, "max_length") else 2048
+                logger.info(f"Set model_max_length to {tokenizer.model_max_length}")
+        except Exception:
+            # Fallback to loading tokenizer from base model
+            if base_model_name is None:
+                base_model_name = config.model.model_name
+            tokenizer = load_tokenizer(base_model_name, max_length=config.data.max_length)
 
         # If base model name not provided, try to get it from config
         if base_model_name is None:
