@@ -77,9 +77,11 @@ python scripts/inference.py --text "Apple Inc. CEO Tim Cook announced new produc
 - **[Hyperparameter Tuning](user-guide/hyperparameter-tuning.md)** - Optimize model performance
 
 ### For Advanced Users
+<!-- Coming soon:
 - **[Model Architecture](advanced/model-architecture.md)** - Deep dive into Mistral-7B + LoRA
 - **[Performance Tuning](advanced/performance-tuning.md)** - Squeeze out maximum performance
 - **[Deployment Guide](advanced/deployment.md)** - Deploy to production
+-->
 
 ## 🏆 Performance Highlights
 

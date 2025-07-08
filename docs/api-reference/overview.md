@@ -179,7 +179,7 @@ with HyperparameterOptimizer(config.hyperopt) as optimizer:
 
 ## REST API
 
-See [REST API Reference](rest-api.md) for HTTP endpoint documentation.
+<!-- See [REST API Reference](rest-api.md) for HTTP endpoint documentation. -->
 
 ## CLI Reference
 
@@ -274,6 +274,6 @@ except Exception as e:
 
 ## Next Steps
 
-- Explore the [Python API](python-api.md) in detail
-- Learn about the [REST API](rest-api.md)
+<!-- - Explore the [Python API](python-api.md) in detail -->
+<!-- - Learn about the [REST API](rest-api.md) -->
 - See [examples](https://github.com/nevedomski/mistral_ner/tree/main/examples) for real-world usage
