@@ -406,6 +406,11 @@ class TestCustomTrainerClass:
         # Model config
         config.model.num_labels = 3
 
+        # Data config
+        config.data.label_names = ["O", "B-PER", "I-PER"]
+        config.training.label_smoothing = 0.1
+        config.training.class_balanced_beta = 0.9999
+
         return config
 
     @patch("src.training.logger")
@@ -428,7 +433,7 @@ class TestCustomTrainerClass:
 
         # Assert
         assert issubclass(CustomTrainerClass, object)
-        mock_compute_freq.assert_called_once_with(mock_train_dataset, "labels")
+        mock_compute_freq.assert_called_once_with(mock_train_dataset)
         mock_create_loss.assert_called_once()
         mock_logger.info.assert_called()
 
@@ -442,13 +447,22 @@ class TestCustomTrainerClass:
         config = Mock()
         config.training.loss_type = "cross_entropy"
         config.training.use_class_weights = False
+        config.training.focal_alpha = None
+        config.training.focal_gamma = 2.0
+        config.data.label_names = ["O", "B-PER", "I-PER"]
+        config.training.label_smoothing = 0.0
+        config.training.class_balanced_beta = 0.9999
 
         # Act
         CustomTrainerClass = create_custom_trainer_class(config, None)
 
         # Assert
         assert issubclass(CustomTrainerClass, object)
-        mock_create_loss.assert_not_called()
+        mock_create_loss.assert_called_once()
+        # Verify loss was created with correct parameters
+        call_args = mock_create_loss.call_args
+        assert call_args.kwargs["loss_type"] == "cross_entropy"
+        assert call_args.kwargs["class_frequencies"] is None
 
 
 class TestRunTrainingPipeline:

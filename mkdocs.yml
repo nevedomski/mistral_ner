@@ -149,6 +149,7 @@ nav:
     - Loss Functions: user-guide/loss-functions.md
     - Datasets: user-guide/datasets.md
     - Hyperparameter Tuning: user-guide/hyperparameter-tuning.md
+    - Checkpoint Saving & Loading: checkpoint_saving_loading.md
   - API Reference:
     - Overview: api-reference/overview.md
   - Reference:

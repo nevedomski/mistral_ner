@@ -514,20 +514,32 @@ def create_loss_function(
         # For focal loss, weights are passed as alpha parameter
         if class_weights is not None and "alpha" not in kwargs:
             kwargs["alpha"] = class_weights
-        return FocalLoss(num_labels=num_labels, **kwargs)
+        # Extract only focal loss specific parameters
+        focal_kwargs = {k: v for k, v in kwargs.items() if k in ["alpha", "gamma", "ignore_index", "reduction"]}
+        return FocalLoss(num_labels=num_labels, **focal_kwargs)
     elif loss_type == "label_smoothing":
-        return LabelSmoothingLoss(num_labels=num_labels, **kwargs)
+        # Extract only label smoothing specific parameters
+        ls_kwargs = {k: v for k, v in kwargs.items() if k in ["smoothing", "ignore_index"]}
+        return LabelSmoothingLoss(num_labels=num_labels, **ls_kwargs)
     elif loss_type == "class_balanced":
         if class_frequencies is None:
             raise ValueError("class_frequencies required for class_balanced loss")
-        return ClassBalancedLoss(num_labels=num_labels, class_frequencies=class_frequencies, **kwargs)
+        # Extract only class balanced specific parameters
+        cb_kwargs = {k: v for k, v in kwargs.items() if k in ["beta", "ignore_index", "loss_type"]}
+        return ClassBalancedLoss(num_labels=num_labels, class_frequencies=class_frequencies, **cb_kwargs)
     elif loss_type == "cross_entropy" or loss_type == "weighted_cross_entropy":
+        # Extract only cross entropy specific parameters
+        ce_kwargs = {k: v for k, v in kwargs.items() if k in ["ignore_index", "reduction", "label_smoothing"]}
         if class_weights is not None:
             weight_tensor = torch.tensor(class_weights, dtype=torch.float32)
-            return nn.CrossEntropyLoss(weight=weight_tensor, **kwargs)
-        return nn.CrossEntropyLoss(**kwargs)
+            return nn.CrossEntropyLoss(weight=weight_tensor, **ce_kwargs)
+        return nn.CrossEntropyLoss(**ce_kwargs)
     elif loss_type == "batch_balanced_focal":
+        # Extract only batch balanced focal specific parameters
+        bbf_kwargs = {
+            k: v for k, v in kwargs.items() if k in ["gamma", "batch_balance_beta", "ignore_index", "reduction"]
+        }
         # For batch-balanced focal loss
-        return BatchBalancedFocalLoss(num_labels=num_labels, base_alpha=class_weights, **kwargs)
+        return BatchBalancedFocalLoss(num_labels=num_labels, base_alpha=class_weights, **bbf_kwargs)
     else:
         raise ValueError(f"Unsupported loss_type: {loss_type}")

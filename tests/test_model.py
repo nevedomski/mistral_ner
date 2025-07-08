@@ -354,7 +354,7 @@ class TestSetupModel:
         assert model == mock_peft_model
         assert tokenizer == mock_tokenizer
 
-        mock_load_tokenizer.assert_called_once_with("test-model")
+        mock_load_tokenizer.assert_called_once_with("test-model", max_length=256)
         mock_create_bnb.assert_called_once_with(False, True)  # Default load_in_8bit=False, load_in_4bit=True
         mock_load_base.assert_called_once_with("test-model", sample_config, mock_bnb_config)
         mock_create_lora.assert_called_once_with(sample_config)
@@ -495,6 +495,9 @@ class TestLoadModelFromCheckpoint:
     ):
         """Test successful model loading from checkpoint."""
         mock_tokenizer = Mock()
+        mock_tokenizer.pad_token = "[PAD]"
+        mock_tokenizer.eos_token = "[EOS]"
+        mock_tokenizer.model_max_length = 512
         mock_base_model = Mock()
         mock_peft_model = Mock()
         mock_bnb_config = Mock()
@@ -521,6 +524,9 @@ class TestLoadModelFromCheckpoint:
     ):
         """Test model loading from checkpoint with custom base model."""
         mock_tokenizer = Mock()
+        mock_tokenizer.pad_token = "[PAD]"
+        mock_tokenizer.eos_token = "[EOS]"
+        mock_tokenizer.model_max_length = 512
         mock_base_model = Mock()
         mock_peft_model = Mock()
         mock_bnb_config = Mock()

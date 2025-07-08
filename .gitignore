@@ -103,3 +103,6 @@ mistral_ner_agents/
 # Wandb logs
 wandb_logs/
 
+# MkDocs
+site/
+

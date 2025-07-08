@@ -279,6 +279,9 @@ class TrainingConfig:
     hub_model_id: str | None = None
     hub_strategy: str = "every_save"
 
+    # Model saving configuration
+    merge_adapters_on_save: bool = True  # Merge LoRA adapters into base model for final save
+
 
 @dataclass
 class LoggingConfig:
