@@ -1,0 +1,18 @@
+log_level: "info"
+log_dir: "./logs"
+disable_tqdm: false
+
+# WandB configuration - OFFLINE MODE
+use_wandb: true
+wandb_project: "mistral-ner"
+wandb_entity: null
+wandb_name: "offline-training"
+wandb_tags: 
+  - "offline"
+  - "experiment"
+wandb_notes: "Training run in offline mode for later syncing"
+wandb_mode: "offline"  # OFFLINE MODE
+wandb_dir: "./wandb_logs"
+wandb_resume: "allow"
+wandb_run_id: null
+wandb_api_key: null

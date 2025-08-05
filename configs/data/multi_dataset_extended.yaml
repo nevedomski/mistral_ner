@@ -1,0 +1,41 @@
+max_length: 256
+label_all_tokens: false
+return_entity_level_metrics: true
+# Mixing strategy
+mixing_strategy: "interleave"  # Options: concat, interleave, weighted
+  
+datasets: 
+      # Traditional NER (Tier 1)
+    "conll":      # Baseline - 4 entities
+      # Filter non-English data
+      filter_english: true
+      weight: 0.15
+    "ontonotes":      # Large-scale - 18 entities
+      filter_english: true
+      # Memory management - limit samples per dataset
+      max_samples_per_dataset: 50000
+      weight: 0.20
+    "wnut":         # Emerging entities - 6 entities
+      filter_english: true
+      weight: 0.10
+    "fewnerd":        # Fine-grained - 66 entity types
+      filter_english: true
+      # Memory management - limit samples per dataset
+      max_samples_per_dataset: 50000
+      weight: 0.15
+    "wikiner":        # Wikipedia NER - 3 entities
+      filter_english: true
+
+      # PII Detection (Tier 2)
+    "gretel":    # Financial PII - 29+ types
+      filter_english: true
+      # Memory management - limit samples per dataset
+      max_samples_per_dataset: 50000
+      weight: 0.10
+    "ai4privacy":    # General PII - 54 types
+      filter_english: true
+      weight: 0.10
+    "mendeley":  # Synthetic PII - 200k examples
+      filter_english: true
+      weight: 0.10
+    # "bigcode_pii":  # Code PII - requires auth token

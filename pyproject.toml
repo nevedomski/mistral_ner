@@ -1,0 +1,281 @@
+[project]
+name = "mistral-ner"
+version = "0.3.0"
+description = "Fine-tune Mistral-7B for Named Entity Recognition (NER) on the CoNLL-2003 dataset using Hugging Face Transformers."
+authors = [
+    {name = "Sergei Nevedomski", email = "neviadomski@gmail.com"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11,<3.12"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+    "accelerate>=1.7.0",
+    "datasets>=3.6.0",
+    "evaluate>=0.4.3",
+    "numpy>=2.2.5",
+    "protobuf>=6.31.0",
+    "peft>=0.4.0",
+    "sentencepiece>=0.2.0",
+    "seqeval>=1.2.2",
+    "transformers>=4.51.3",
+    "wandb>=0.16.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "ray[tune]>=2.46.0",
+    "optuna>=4.3.0",
+    "matplotlib>=3.10.3",
+    "seaborn>=0.13.2",
+    "hydra-core>=1.3.2",
+    "pydantic>=2.11.5",
+    "huggingface-hub[cli]>=0.33.4",
+]
+
+[project.optional-dependencies]
+cuda = [
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
+    "bitsandbytes>=0.41.0",
+]
+api = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.0.0",
+]
+cpu = [
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.4.7",
+    "mypy>=1.9.0",
+    "types-PyYAML",
+    "types-requests",
+    "types-tqdm",
+    "types-protobuf",
+    "pandas-stubs",
+    "rich>=13.0.0",
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0", 
+    "torchvision>=0.22.0",
+    "httpx>=0.24.0",
+    "ray[tune]>=2.46.0",
+    "optuna>=4.3.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-mermaid2-plugin>=0.6.0",
+    "mkdocs-include-markdown-plugin>=6.0.0",
+]
+cuda11 = [
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
+    "bitsandbytes>=0.41.0",
+]
+cuda12 = [
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
+    "bitsandbytes>=0.41.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nevedomski/mistral-ner"
+Documentation = "https://github.com/nevedomski/mistral-ner#readme"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py311"
+
+# Exclude ML-specific directories
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+    "notebooks",  # Temporarily exclude notebooks
+    "data",
+    "models",
+    "mlruns",
+    "logs",
+    "wandb_logs",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "I",      # isort
+    "N",      # pep8-naming
+    "NPY",    # NumPy-specific rules
+    "PD",     # pandas-vet
+    "PT",     # flake8-pytest-style
+    "RUF",    # Ruff-specific rules
+]
+
+ignore = [
+    "E501",   # Line length (formatter handles)
+    "PD901",  # Allow 'df' variable name
+    "N803",   # ML convention: uppercase arguments (X, y)
+    "N806",   # ML convention: uppercase variables
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "api", "scripts"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Start permissive for gradual typing
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_optional = true
+ignore_missing_imports = false
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+pretty = true
+show_error_codes = true
+show_column_numbers = true
+
+# Performance optimizations
+fast_module_lookup = true
+incremental = true
+cache_dir = ".mypy_cache"
+sqlite_cache = true
+
+# Gradual typing - start with src/ only
+files = ["src/**/*.py", "scripts/**/*.py", "api/**/*.py"]
+exclude = ["tests", "notebooks", "build", "dist", "test_run.py"]
+
+# ML-specific settings
+plugins = ["pydantic.mypy"]  # For config validation
+
+# Per-module overrides for ML libraries
+[[tool.mypy.overrides]]
+module = [
+    "transformers",
+    "transformers.*",
+    "datasets",
+    "datasets.*",
+    "torch",
+    "torch.*",
+    "torchvision",
+    "torchvision.*",
+    "torchaudio",
+    "torchaudio.*",
+    "accelerate",
+    "accelerate.*",
+    "peft",
+    "peft.*",
+    "bitsandbytes",
+    "bitsandbytes.*",
+    "wandb",
+    "wandb.*",
+    "seqeval",
+    "seqeval.*",
+    "sentencepiece",
+    "sentencepiece.*",
+    "evaluate",
+    "evaluate.*",
+]
+follow_imports = "skip"
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "numpy.*"
+ignore_missing_imports = false  # NumPy has good type support
+
+[[tool.mypy.overrides]]
+module = "pandas.*"
+ignore_missing_imports = true  # Pandas typing is incomplete
+
+[[tool.mypy.overrides]]
+module = "sklearn.*"
+ignore_missing_imports = true  # sklearn doesn't have type stubs
+
+# Stricter typing for our own code
+[[tool.mypy.overrides]]
+module = "src.*"
+disallow_untyped_defs = true
+disallow_any_generics = true
+warn_return_any = true
+strict_equality = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=85",
+]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "performance: marks tests as performance regression tests (may be slow)",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "regression: marks tests as regression tests",
+    "asyncio: marks tests as async tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::UserWarning:torch.*",
+    "ignore::UserWarning:transformers.*",
+    "ignore::FutureWarning:transformers.*",
+]
+
+[dependency-groups]
+dev = [
+    "types-pyyaml>=6.0.12.20250516",
+    "types-requests>=2.32.4.20250611",
+]

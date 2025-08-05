@@ -1,0 +1,17 @@
+# Multi-dataset training configuration
+# This configuration demonstrates training with multiple NER datasets
+defaults:
+  - model: mistral7b03_qlora
+  - data: multi_dataset
+  - training: focal_fp16_tf32
+  - logging: info_wandb
+  
+  
+  
+    
+  
+    
+    
+    
+  
+

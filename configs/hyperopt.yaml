@@ -1,0 +1,10 @@
+# Hyperparameter optimization configuration for Mistral NER
+# This config enables combined Bayesian optimization (Optuna) + Hyperband (ASHA)
+
+defaults:
+  - model: mistral7b03_qlora
+  - data: conll
+  - training: focal_fp16_tf32
+  - logging: info_wandb
+  - hyperopt: combined
+

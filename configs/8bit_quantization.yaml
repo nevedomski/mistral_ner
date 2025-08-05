@@ -1,0 +1,14 @@
+# Configuration for 8-bit quantization training
+# This uses 8-bit quantization instead of the default 4-bit QLoRA
+
+defaults:
+  - model: mistral7b03_qlora
+  - data: conll
+  - training: focal_fp16_tf32
+  - logging: info_wandb
+  - _self_
+  
+
+model:
+  load_in_8bit: true    # Enable 8-bit quantization
+  load_in_4bit: false   # Disable 4-bit quantization

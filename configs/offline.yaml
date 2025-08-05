@@ -1,0 +1,10 @@
+# Offline configuration for Mistral NER fine-tuning
+# This configuration runs training in offline mode for later syncing
+
+defaults:
+  - model: mistral7b03_qlora
+  - data: conll
+  - training: focal_fp16_tf32
+  - logging: info_wandb_offline
+  - _self_ 
+ 

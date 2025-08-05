@@ -1,0 +1,6 @@
+# Default configuration for Mistral NER fine-tuning
+defaults:
+  - model: mistral7b03_qlora
+  - data: conll
+  - training: focal_fp16_tf32
+  - logging: info_wandb

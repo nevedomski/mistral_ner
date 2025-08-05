@@ -1,0 +1,22 @@
+max_length: 256
+label_all_tokens: false
+return_entity_level_metrics: true
+# Mixing strategy
+mixing_strategy: "interleave"  # Options: concat, interleave, weighted
+  
+# Traditional NER datasets first (Tier 1)
+datasets: 
+  "conll":     # Baseline      
+      # Weights for each dataset (must sum to 1.0)
+      # Higher weight = more samples from that dataset
+      weight: 0.15
+  "ontonotes":     # Largest traditional dataset      
+      weight: 0.25
+  "ai4privacy":       # Emerging entities
+      weight: 0.3
+  "gretel":   # PII/Financial entities
+      weight: 0.3
+      # Filter non-English data
+      filter_english: true 
+      # Optional: limit samples per dataset for memory
+      # max_samples_per_dataset: 10000

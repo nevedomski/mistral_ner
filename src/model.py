@@ -1,0 +1,388 @@
+"""Model setup and configuration for Mistral NER fine-tuning."""
+
+from __future__ import annotations
+
+import gc
+import logging
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+import torch
+from peft import LoraConfig, PeftMixedModel, PeftModel, TaskType, get_peft_model
+from transformers import (
+    AutoModelForTokenClassification,
+    AutoTokenizer,
+)
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+from transformers.utils.quantization_config import BitsAndBytesConfig
+
+# Setup logging
+logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from .config import Config
+
+
+def create_bnb_config(config: Config, load_in_8bit: bool = False, load_in_4bit: bool = True) -> BitsAndBytesConfig | None:
+    """Create BitsAndBytes configuration for model quantization."""
+
+    # Check if bitsandbytes is available
+    try:
+        import bitsandbytes as bnb  # type: ignore[import, unused-ignore]
+
+        logger.info(f"BitsAndBytes version: {bnb.__version__}")
+    except ImportError:
+        logger.error("BitsAndBytes library not installed. Please install with: pip install bitsandbytes")
+        logger.warning("Falling back to full precision model")
+        return None
+
+    # Log the configuration being used
+    logger.info(f"Quantization config: load_in_8bit={load_in_8bit}, load_in_4bit={load_in_4bit}")
+
+    if load_in_8bit and not load_in_4bit:
+        bnb_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+            bnb_8bit_compute_dtype=torch.float16,
+            bnb_8bit_quant_type="nf8",
+            bnb_8bit_use_double_quant=True,
+        )
+        logger.info("Created 8-bit quantization config")
+    elif load_in_4bit and not load_in_8bit:
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+        logger.info("Created 4-bit quantization config (QLoRA)")
+    elif load_in_8bit and load_in_4bit:
+        logger.warning("Both 8-bit and 4-bit quantization requested. Using 4-bit as it's more memory efficient.")
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+    else:
+        # No quantization
+        bnb_config = None
+        logger.info("No quantization config - using full precision")
+
+    return bnb_config
+
+
+def create_lora_config(config: Config) -> LoraConfig:
+    """Create LoRA configuration."""
+
+    lora_config = LoraConfig(
+        r=config.model.lora_r,
+        lora_alpha=config.model.lora_alpha,
+        target_modules=config.model.target_modules,
+        lora_dropout=config.model.lora_dropout,
+        bias=config.model.lora_bias,
+        task_type=getattr(TaskType, config.model.task_type),
+    )
+
+    logger.info(
+        f"Created LoRA config: r={config.model.lora_r}, alpha={config.model.lora_alpha}, target_modules={config.model.target_modules}"
+    )
+
+    return lora_config
+
+
+def load_tokenizer(model_name: str, config: Config, max_length: int | None = None) -> PreTrainedTokenizerBase:
+    """Load and configure tokenizer.
+
+    Args:
+        model_name: Name or path of the model
+        max_length: Maximum sequence length from config (optional)
+
+    Returns:
+        Configured tokenizer
+    """
+
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=config.model.trust_remote_code, add_prefix_space=True)
+
+        # Set padding token if not present
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+            logger.info(f"Set pad_token to eos_token: {tokenizer.pad_token}")
+
+        # Set model max length if not set or unreasonably large
+        if tokenizer.model_max_length > 100000 or max_length is not None:
+            # Use config value if provided, otherwise default to 2048
+            tokenizer.model_max_length = max_length if max_length is not None else 2048
+            logger.info(f"Set model_max_length to {tokenizer.model_max_length}")
+
+        return tokenizer
+
+    except Exception as e:
+        logger.error(f"Failed to load tokenizer: {e}")
+        raise
+
+
+def load_base_model(model_name: str, config: Config, bnb_config: BitsAndBytesConfig | None = None) -> PreTrainedModel:
+    """Load the base model with optional quantization."""
+
+    try:
+        logger.info(f"Loading base model: {model_name}")
+
+        num_labels = config.data.num_labels
+        if num_labels is None:
+            logger.error("num_labels is unknown. Unified multi-dataset was not initialized. Please, run mix_datasets() first.")
+            raise ValueError("num_labels is unknown. Unified multi-dataset was not initialized. Please, run mix_datasets() first.")
+
+        # Validate we have valid labels
+        if num_labels < 2:
+            raise ValueError(f"Invalid num_labels: {num_labels}. Need at least 2 labels for classification.")
+
+        logger.info(f"Calculated num_labels: {num_labels}")
+        logger.info(f"Data config - label_names: {config.data.label_names[:10]}{'...' if len(config.data.label_names) > 10 else ''}")
+
+        # Model loading arguments
+        model_kwargs = {
+            "num_labels": num_labels,
+            "id2label": config.data.id2label,
+            "label2id": config.data.label2id,
+            "trust_remote_code": config.model.trust_remote_code,
+            "use_cache": config.model.use_cache,
+        }
+
+        # Add quantization config if provided
+        if bnb_config is not None:
+            model_kwargs["quantization_config"] = bnb_config
+            model_kwargs["device_map"] = config.model.device_map
+            logger.info(f"Loading model with quantization: {type(bnb_config).__name__}")
+            logger.info(
+                f"Quantization details: 8-bit={getattr(bnb_config, 'load_in_8bit', False)}, 4-bit={getattr(bnb_config, 'load_in_4bit', False)}"
+            )
+        else:
+            logger.info("Loading model without quantization (full precision)")
+
+        # Handle potential out of memory errors
+        try:
+            # Add ignore_mismatched_sizes to handle models without token classification heads
+            model = AutoModelForTokenClassification.from_pretrained(model_name, ignore_mismatched_sizes=True, **model_kwargs)
+        except torch.cuda.OutOfMemoryError:
+            logger.error("CUDA out of memory. Trying to free cache...")
+            gc.collect()
+            torch.cuda.empty_cache()
+
+            # Try again with CPU offloading
+            model_kwargs["device_map"] = {"": "cpu", "lm_head": 0, "score": 0}
+            model = AutoModelForTokenClassification.from_pretrained(model_name, ignore_mismatched_sizes=True, **model_kwargs)
+            logger.warning("Model loaded with CPU offloading due to memory constraints")
+
+        # Enable gradient checkpointing if specified
+        if config.training.gradient_checkpointing:
+            model.gradient_checkpointing_enable()
+            logger.info("Gradient checkpointing enabled")
+
+        # Prepare model for k-bit training
+        if hasattr(model, "prepare_for_kbit_training"):
+            model = prepare_model_for_kbit_training(model)
+
+        return model
+
+    except Exception as e:
+        logger.error(f"Failed to load base model: {e}")
+        raise
+
+
+def prepare_model_for_kbit_training(model: PreTrainedModel) -> PreTrainedModel:
+    """Prepare model for k-bit training."""
+    model.gradient_checkpointing_enable()
+    model = model.prepare_for_kbit_training()
+
+    # Fix for potential issues with some model architectures
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # Enable input require grads
+    if hasattr(model, "enable_input_require_grads"):
+        model.enable_input_require_grads()
+    else:
+
+        def make_inputs_require_grad(module: torch.nn.Module, inputs: torch.Tensor | Sequence[torch.Tensor], output: torch.Tensor) -> None:
+            if hasattr(inputs, "requires_grad_"):
+                inputs.requires_grad_(True)
+            elif isinstance(inputs, list | tuple):
+                for inp in inputs:
+                    if hasattr(inp, "requires_grad_"):
+                        inp.requires_grad_(True)
+
+        model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+
+    return model
+
+
+def setup_peft_model(model: PreTrainedModel, config: Config, lora_config: LoraConfig) -> PeftModel | PeftMixedModel:
+    """Setup PEFT model with LoRA."""
+
+    try:
+        logger.info("Setting up PEFT model with LoRA...")
+
+        # Get PEFT model
+        peft_model = get_peft_model(model, lora_config)
+
+        # Print trainable parameters
+        trainable_params = 0
+        all_param = 0
+        for _, param in peft_model.named_parameters():
+            all_param += param.numel()
+            if param.requires_grad:
+                trainable_params += param.numel()
+
+        trainable_percent = 100 * trainable_params / all_param
+        logger.info(f"Trainable params: {trainable_params:,} || All params: {all_param:,} || Trainable%: {trainable_percent:.4f}")
+
+        return peft_model
+
+    except Exception as e:
+        logger.error(f"Failed to setup PEFT model: {e}")
+        raise
+
+
+def setup_model(
+    model_name: str, config: Config, device_map: str | None = None
+) -> tuple[PeftModel | PeftMixedModel, PreTrainedTokenizerBase]:
+    """
+    Complete model setup including tokenizer, base model, and LoRA.
+
+    Args:
+        model_name: Name or path of the model
+        config: Configuration object
+        device_map: Device mapping for model placement
+
+    Returns:
+        Tuple of (model, tokenizer)
+    """
+    # Override device map if provided
+    if device_map is not None:
+        config.model.device_map = device_map
+
+    # Load tokenizer with max_length from config
+    tokenizer = load_tokenizer(model_name, config, max_length=config.data.max_length)
+
+    # Create quantization config
+    bnb_config = (
+        create_bnb_config(config, config.model.load_in_8bit, config.model.load_in_4bit)
+        if (config.model.load_in_8bit or config.model.load_in_4bit)
+        else None
+    )
+
+    # Load base model
+    model = load_base_model(model_name, config, bnb_config)
+
+    # Create LoRA config and setup PEFT
+    lora_config = create_lora_config(config)
+    model = setup_peft_model(model, config, lora_config)
+
+    return model, tokenizer
+
+
+# def save_model_checkpoint(
+#     model: PreTrainedModel | PeftModel,
+#     tokenizer: PreTrainedTokenizerBase,
+#     output_dir: str,
+#     is_final: bool = False,
+#     config: Config | None = None,
+# ) -> None:
+#     """Save model checkpoint with configuration."""
+#
+
+#     try:
+#         logger.info(f"Saving {'final' if is_final else 'checkpoint'} to {output_dir}")
+
+#         # Create output directory if it doesn't exist
+#         Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+#         # Save model
+#         model.save_pretrained(output_dir)
+
+#         # Save tokenizer
+#         tokenizer.save_pretrained(output_dir)
+
+#         # Save config if provided
+#         if config is not None:
+#             config_path = Path(output_dir) / "config.yaml"
+#             config.to_yaml(config_path)
+#             logger.info(f"Config saved to {config_path}")
+
+#         logger.info("Model, tokenizer, and config saved successfully")
+
+#     except Exception as e:
+#         logger.error(f"Failed to save model checkpoint: {e}")
+#         raise
+
+
+# def load_model_from_checkpoint(
+#     checkpoint_path: str, config: Config, base_model_name: str | None = None
+# ) -> tuple[PeftModel, PreTrainedTokenizerBase]:
+#     """Load model from a checkpoint."""
+#
+
+#     try:
+#         logger.info(f"Loading model from checkpoint: {checkpoint_path}")
+
+#         # Load tokenizer from checkpoint
+#         # First try to load from checkpoint, if that fails, load from base model
+#         try:
+#             tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+#             # Apply same configuration as load_tokenizer
+#             if tokenizer.pad_token is None:
+#                 tokenizer.pad_token = tokenizer.eos_token
+#                 logger.info(f"Set pad_token to eos_token: {tokenizer.pad_token}")
+
+#             if tokenizer.model_max_length > 100000:
+#                 tokenizer.model_max_length = config.data.max_length if hasattr(config.data, "max_length") else 2048
+#                 logger.info(f"Set model_max_length to {tokenizer.model_max_length}")
+#         except Exception:
+#             # Fallback to loading tokenizer from base model
+#             if base_model_name is None:
+#                 base_model_name = config.model.model_name
+#             tokenizer = load_tokenizer(base_model_name, config, max_length=config.data.max_length)
+
+#         # If base model name not provided, try to get it from config
+#         if base_model_name is None:
+#             base_model_name = config.model.model_name
+
+#         # Create quantization config
+#         load_in_4bit = getattr(config.model, "load_in_4bit", False)
+#         bnb_config = create_bnb_config(config.model.load_in_8bit, load_in_4bit) if (config.model.load_in_8bit or load_in_4bit) else None
+
+#         # Load base model
+#         base_model = load_base_model(base_model_name, config, bnb_config)
+
+#         # Load PEFT model
+#         model = PeftModel.from_pretrained(base_model, checkpoint_path)
+
+#         logger.info("Model loaded successfully from checkpoint")
+
+#         return model, tokenizer
+
+#     except Exception as e:
+#         logger.error(f"Failed to load model from checkpoint: {e}")
+#         raise
+
+
+def merge_and_save_model(model: PeftModel | PeftMixedModel, tokenizer: PreTrainedTokenizerBase, output_dir: str) -> None:
+    """Merge LoRA weights with base model and save."""
+
+    try:
+        logger.info("Merging LoRA weights with base model...")
+
+        # Merge LoRA weights
+        merged_model = model.merge_and_unload()
+
+        # Save merged model
+        merged_model.save_pretrained(output_dir, safe_serialization=True)
+        tokenizer.save_pretrained(output_dir)
+
+        logger.info(f"Merged model saved to {output_dir}")
+
+    except Exception as e:
+        logger.error(f"Failed to merge and save model: {e}")
+        raise

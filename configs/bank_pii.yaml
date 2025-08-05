@@ -1,0 +1,18 @@
+# Bank Call Transcript PII Detection Configuration
+# Optimized for identifying PII in banking conversations
+# Uses 4 datasets: CoNLL-2003, OntoNotes, Gretel PII, AI4Privacy
+defaults:
+  - model: mistral7b03_qlora
+  - data: pii_dataset
+  - training: focal_fp16_tf32
+  - logging: info_wandb_off
+  - data/datasets: 
+    - conll_pii
+    - ontonotes_pii
+    - gretel_pii
+    - ai4privacy_pii
+  - _self_
+  
+  
+
+
